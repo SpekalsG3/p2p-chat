@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "bin/node",
 ]
 
 [workspace.package]
@@ -11,3 +12,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace.dependencies]
+tokio = "1.35.1"
+serde = "1.0.195"
+serde_json = "1.0.111"
