@@ -1,10 +1,14 @@
 mod server;
 mod client;
+mod types;
+mod frontend;
 
 use std::env::args;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::sync::mpsc::channel;
 use crate::client::start_client;
+use crate::frontend::handle_messages;
 use crate::server::start_server;
 
 fn main() {
@@ -36,19 +40,28 @@ fn main() {
 
     println!("---Init threads");
 
+    let (tx, rx) = channel();
     let mut handles = vec![];
 
     if let Some(server_addr) = server_addr {
-        let server_handle = std::thread::spawn(move || {
-            start_server(server_addr)
+        let tx = tx.clone();
+        let handle = std::thread::spawn(move || {
+            start_server(tx, server_addr)
         });
-        handles.push(server_handle);
+        handles.push(handle);
     }
     if let Some(client_addr) = client_addr {
-        let client_handle = std::thread::spawn(move || {
-            start_client(client_addr)
+        let tx = tx.clone();
+        let handle = std::thread::spawn(move || {
+            start_client(tx, client_addr)
         });
-        handles.push(client_handle);
+        handles.push(handle);
+    }
+    {
+        let handle = std::thread::spawn(move || {
+            handle_messages(rx)
+        });
+        handles.push(handle);
     }
 
     for handle in handles {
