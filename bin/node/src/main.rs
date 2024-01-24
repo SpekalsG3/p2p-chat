@@ -8,8 +8,9 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use crate::client::start_client;
-use crate::frontend::handle_messages;
+use crate::frontend::handle_packages;
 use crate::server::start_server;
+use crate::types::state::AppState;
 
 fn main() {
     let (server_addr, client_addr) = {
@@ -41,25 +42,27 @@ fn main() {
     println!("---Init threads");
 
     let (tx, rx) = channel();
+    let app_state = AppState::new(tx);
     let mut handles = vec![];
 
     if let Some(server_addr) = server_addr {
-        let tx = tx.clone();
+        let app_state = app_state.clone();
         let handle = std::thread::spawn(move || {
-            start_server(tx, server_addr)
+            start_server(app_state, server_addr)
         });
         handles.push(handle);
     }
     if let Some(client_addr) = client_addr {
-        let tx = tx.clone();
+        let app_state = app_state.clone();
         let handle = std::thread::spawn(move || {
-            start_client(tx, client_addr)
+            start_client(app_state, client_addr)
         });
         handles.push(handle);
     }
     {
+        let app_state = app_state.clone();
         let handle = std::thread::spawn(move || {
-            handle_messages(rx)
+            handle_packages(app_state, rx);
         });
         handles.push(handle);
     }
