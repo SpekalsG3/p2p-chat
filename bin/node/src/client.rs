@@ -8,7 +8,7 @@ pub fn start_client(
     client_addr: SocketAddr,
 ) {
     let mut client = TcpStream::connect(client_addr).expect("---Failed to connect");
-    println!("---Connected to the server at {}", client_addr);
+    app_state.ui().system_message(&format!("---Connected to the server at {}", client_addr));
 
     app_state.add_stream(
         client_addr,
@@ -29,7 +29,7 @@ pub fn start_client(
                 })).expect("---failed to send msg through channel");
             }
             Err(e) => {
-                eprintln!("---failed to read {}", e)
+                app_state.ui().system_message(&format!("---failed to read {}", e))
             }
         }
     }

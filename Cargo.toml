@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "bin/node",
+    "bin/node", "bin/testing",
 ]
 
 [workspace.package]

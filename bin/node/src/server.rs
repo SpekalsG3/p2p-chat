@@ -8,16 +8,27 @@ fn handle_connection(
     mut stream: TcpStream,
     addr: SocketAddr,
 ) {
-    println!("---New request from {}", addr);
+    app_state.ui().system_message(&format!("---New request from {}", addr));
 
     app_state.add_stream(
         addr,
         stream.try_clone().expect("---Failed to clone tcp stream"),
     ).expect("---Failed to save stream");
 
+    let pad = (1..5).into_iter();
+    let mut pad_temp = pad.clone();
+
     loop {
         std::thread::sleep(Duration::from_secs(1));
-        match stream.write("hello".as_bytes()) {
+        let add = match pad_temp.next() {
+            Some(n) => "_".repeat(n),
+            None => {
+                pad_temp = pad.clone();
+                let n = pad_temp.next().unwrap();
+                "_".repeat(n)
+            }
+        };
+        match stream.write(format!("hello{}", add).as_bytes()) {
             Ok(_) => {
             }
             Err(_) => {
@@ -32,8 +43,7 @@ pub fn start_server(
     server_addr: SocketAddr,
 ) {
     let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
-    println!("---Listening on {}", server_addr);
-
+    app_state.ui().system_message(&format!("---Listening on {}", server_addr));
 
     loop {
         match server.accept() {
@@ -45,7 +55,7 @@ pub fn start_server(
                 );
             },
             Err(e) => {
-                eprintln!("---Failed to establish connection {}", e);
+                app_state.ui().system_message(&format!("---Failed to establish connection {}", e));
             }
         }
     }

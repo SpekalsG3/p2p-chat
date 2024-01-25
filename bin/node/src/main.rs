@@ -2,6 +2,7 @@ mod server;
 mod client;
 mod types;
 mod frontend;
+mod utils;
 
 use std::env::args;
 use std::net::SocketAddr;
@@ -39,11 +40,11 @@ fn main() {
         (server_addr, client_addr)
     };
 
-    println!("---Init threads");
-
     let (tx, rx) = channel();
     let app_state = AppState::new(tx);
     let mut handles = vec![];
+
+    app_state.ui().system_message("Init threads");
 
     if let Some(server_addr) = server_addr {
         let app_state = app_state.clone();
