@@ -27,13 +27,15 @@ impl UiNoHistory {
         msg: &str,
     ) {
         print!(
-            "{}{}\r[User: {}] {}{}{}",
+            "{}{}{}{}\r[User: {}] {}{}{}",
             V100::SaveCursorPosition,
+            V100::MoveWindowUp,
             V100::GoLineUp(2),
+            V100::InsertBlankLines(1),
             from,
             msg,
-            V100::ClearLineRight,
             V100::RestoreCursorPosition,
+            V100::GoLineDown(1),
         );
         stdout().flush().expect("failed to flash stdout");
     }
