@@ -11,7 +11,7 @@ use std::sync::mpsc::channel;
 use crate::client::start_client;
 use crate::frontend::handle_input::handle_input;
 use crate::frontend::handle_packages::handle_packages;
-use crate::server::start_server;
+use crate::server::handle_connection::start_server;
 use crate::types::state::AppState;
 
 fn main() {
@@ -71,7 +71,7 @@ fn main() {
     {
         let app_state = app_state.clone();
         let handle = std::thread::spawn(move || {
-            handle_input(app_state, client_addr);
+            handle_input(app_state);
         });
         handles.push(handle);
     }

@@ -15,6 +15,11 @@ pub fn start_client(
         client.try_clone().expect("---Failed to clone tcp stream"),
     ).expect("---Failed to save stream to state");
 
+    {
+        let mut lock = app_state.0.m.write().expect("---Failed to take lock");
+        lock.selected_room = Some(client_addr)
+    }
+
     loop {
         let mut buf = [0; 256];
         match client.read(&mut buf) {

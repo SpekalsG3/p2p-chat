@@ -1,18 +1,10 @@
 use std::io::{stdin, stdout, Write};
-use std::net::SocketAddr;
 use crate::frontend::send_message::send_message;
 use crate::types::state::AppState;
 use crate::types::ui::V100;
 
-// [SYSTEM]
-// ---
-// >asdf
-//
-
-
 pub fn handle_input(
     app_state: AppState,
-    addr: Option<SocketAddr>,
 ) {
     let mut handles = vec![];
     let stdin = stdin();
@@ -38,12 +30,19 @@ pub fn handle_input(
         }
 
         let app_state = app_state.clone();
+        let addr = {
+            app_state.0.m
+                .read()
+                .expect("---failed to take read lock")
+                .selected_room
+                .clone()
+        };
         if let Some(addr) = addr {
             let h = std::thread::spawn(move || {
                 send_message(
                     app_state,
                     &str,
-                    addr
+                    addr,
                 )
             });
             handles.push(h); // later will add proper shutdown

@@ -11,6 +11,7 @@ pub(crate) struct AppStateInnerRef {
     ui: UiNoHistory,
 }
 pub(crate) struct AppStateInnerMut {
+    pub(crate) selected_room: Option<SocketAddr>, // or store TcpStream and delete `streams`
     pub(crate) streams: HashMap<SocketAddr, TcpStream>,
     main_sender: Sender<AppPackage>,
 }
@@ -30,6 +31,7 @@ impl AppState {
                 ui: UiNoHistory::new(),
             },
             m: RwLock::new(AppStateInnerMut {
+                selected_room: None,
                 streams: Default::default(),
                 main_sender: sender,
             }),
