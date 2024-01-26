@@ -5,15 +5,14 @@ use std::sync::{Arc, RwLock};
 use std::sync::mpsc::Sender;
 use anyhow::{anyhow, bail, Context, Result};
 use crate::types::package::AppPackage;
-use crate::utils::ui::UiNoHistory;
+use crate::utils::ui::UI;
 
 pub(crate) struct AppStateInnerRef {
-    ui: UiNoHistory,
 }
 pub(crate) struct AppStateInnerMut {
     pub(crate) selected_room: Option<SocketAddr>, // or store TcpStream and delete `streams`
     pub(crate) streams: HashMap<SocketAddr, TcpStream>,
-    main_sender: Sender<AppPackage>,
+    packager_sender: Sender<AppPackage>,
 }
 pub(crate) struct AppStateInner {
     r: AppStateInnerRef,
@@ -24,16 +23,15 @@ pub struct AppState(pub(crate) Arc<AppStateInner>);
 
 impl AppState {
     pub fn new(
-        sender: Sender<AppPackage>,
+        package_sender: Sender<AppPackage>,
     ) -> Self {
         Self(Arc::new(AppStateInner {
             r: AppStateInnerRef {
-                ui: UiNoHistory::new(),
             },
             m: RwLock::new(AppStateInnerMut {
                 selected_room: None,
                 streams: Default::default(),
-                main_sender: sender,
+                packager_sender: package_sender,
             }),
         }))
     }
@@ -46,11 +44,7 @@ impl AppState {
 
     pub fn send_package(&self, package: AppPackage) -> Result<()> {
         let lock = self.0.m.read().map_err(|e| anyhow!("---Failed to acquire read lock: {}", e.to_string()))?;
-        lock.main_sender.send(package).context("---Failed to send app message")
-    }
-
-    pub fn ui(&self) -> &UiNoHistory {
-        &self.0.r.ui
+        lock.packager_sender.send(package).context("---Failed to send app message")
     }
 
     pub fn send_stream_message(&self, addr: &SocketAddr, message: &[u8]) -> Result<()> {

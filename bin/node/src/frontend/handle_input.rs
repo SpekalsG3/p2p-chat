@@ -2,9 +2,11 @@ use std::io::{stdin, stdout, Write};
 use crate::frontend::send_message::send_message;
 use crate::types::state::AppState;
 use crate::types::ui::V100;
+use crate::utils::ui::UI;
 
 pub fn handle_input(
     app_state: AppState,
+    ui: UI,
 ) {
     let mut handles = vec![];
     let stdin = stdin();
@@ -38,9 +40,11 @@ pub fn handle_input(
                 .clone()
         };
         if let Some(addr) = addr {
+            let ui = ui.clone();
             let h = std::thread::spawn(move || {
                 send_message(
                     app_state,
+                    ui,
                     &str,
                     addr,
                 )

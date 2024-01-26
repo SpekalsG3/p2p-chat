@@ -1,18 +1,33 @@
+use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
 pub enum AppPackage {
-    Message(PackageMessage),
-    NewConn(PackageConnData),
+    Message(MessagePackage),
+    Alert(AlertPackage),
 }
 
 #[derive(Debug)]
-pub struct PackageMessage {
+pub struct MessagePackage {
     pub from: SocketAddr,
     pub msg: Vec<u8>,
 }
 
 #[derive(Debug)]
-pub struct PackageConnData {
-    pub addr: SocketAddr,
+pub enum AlertPackageLevel {
+    DEBUG,
+    ERROR,
+    INFO,
+}
+
+impl Display for AlertPackageLevel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Debug)]
+pub struct AlertPackage {
+    pub level: AlertPackageLevel,
+    pub msg: String,
 }

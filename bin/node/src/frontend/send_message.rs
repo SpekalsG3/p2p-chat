@@ -2,9 +2,11 @@ use std::io::{stdout, Write};
 use std::net::SocketAddr;
 use crate::types::state::AppState;
 use crate::types::ui::V100;
+use crate::utils::ui::UI;
 
 pub fn send_message(
     app_state: AppState,
+    ui: UI,
     message: &str,
     addr: SocketAddr,
 ) {
@@ -17,9 +19,7 @@ pub fn send_message(
             ).as_bytes())
             .expect("Failed to write");
 
-        app_state
-            .ui()
-            .new_message(true, "YOU", message);
+        ui.new_message(true, "YOU", message);
 
         stdout
             .write(format!(

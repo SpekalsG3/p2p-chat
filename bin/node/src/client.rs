@@ -1,6 +1,6 @@
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
-use crate::types::package::{AppPackage, PackageMessage};
+use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
 
 pub fn start_client(
@@ -8,7 +8,12 @@ pub fn start_client(
     client_addr: SocketAddr,
 ) {
     let mut client = TcpStream::connect(client_addr).expect("---Failed to connect");
-    app_state.ui().system_message(&format!("---Connected to the server at {}", client_addr));
+    app_state
+        .send_package(AppPackage::Alert(AlertPackage {
+            level: AlertPackageLevel::INFO,
+            msg: format!("Connected to the server at {}", client_addr),
+        }))
+        .expect("---Failed to send package");
 
     app_state.add_stream(
         client_addr,
@@ -28,13 +33,18 @@ pub fn start_client(
                     continue;
                 }
 
-                app_state.send_package(AppPackage::Message(PackageMessage {
+                app_state.send_package(AppPackage::Message(MessagePackage {
                     from: client_addr,
                     msg: buf.to_vec(),
                 })).expect("---failed to send msg through channel");
             }
             Err(e) => {
-                app_state.ui().system_message(&format!("---failed to read {}", e))
+                app_state
+                    .send_package(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::ERROR,
+                        msg: format!("Failed to read stream - {}", e),
+                    }))
+                    .expect("---Failed to send package");
             }
         }
     }

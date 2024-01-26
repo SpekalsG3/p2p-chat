@@ -1,22 +1,24 @@
 use std::sync::mpsc::Receiver;
-use crate::types::package::AppPackage;
+use crate::types::package::{AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
+use crate::utils::ui::UI;
 
 pub fn handle_packages(
-    app_state: AppState,
+    _app_state: AppState,
+    ui: UI,
     rx: Receiver<AppPackage>,
 ) {
     while let Ok(package) = rx.recv() {
         match package {
             AppPackage::Message(message) => {
                 let msg = String::from_utf8_lossy(&message.msg).to_string();
-                app_state.ui().new_message(false, &message.from.to_string(), &msg)
+                ui.new_message(false, &format!("User: {}", message.from), &msg)
             }
-            AppPackage::NewConn(conn_data) => {
-                app_state.ui().system_message(&format!("new conn {}", conn_data.addr));
+            AppPackage::Alert(alert) => {
+                ui.new_message(false, &format!("System: {}", alert.level), &alert.msg)
             }
         }
     }
 
-    app_state.ui().system_message("channel hangup");
+    ui.new_message(false, &format!("System: {}", AlertPackageLevel::INFO), "channel hangup");
 }

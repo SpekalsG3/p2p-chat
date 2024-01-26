@@ -11,7 +11,9 @@ use std::sync::mpsc::channel;
 use crate::client::start_client;
 use crate::frontend::handle_input::handle_input;
 use crate::frontend::handle_packages::handle_packages;
+use crate::frontend::setup_frontend;
 use crate::server::handle_connection::start_server;
+use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
 
 fn main() {
@@ -41,11 +43,16 @@ fn main() {
         (server_addr, client_addr)
     };
 
-    let (tx, rx) = channel();
-    let app_state = AppState::new(tx);
+    let (package_sender, package_receiver) = channel();
+    let app_state = AppState::new(package_sender);
     let mut handles = vec![];
 
-    app_state.ui().system_message("Init threads");
+    app_state
+        .send_package(AppPackage::Alert(AlertPackage {
+            level: AlertPackageLevel::INFO,
+            msg: "Init threads".to_string(),
+        }))
+        .expect("---Failed to send package");
 
     if let Some(server_addr) = server_addr {
         let app_state = app_state.clone();
@@ -61,20 +68,10 @@ fn main() {
         });
         handles.push(handle);
     }
-    {
-        let app_state = app_state.clone();
-        let handle = std::thread::spawn(move || {
-            handle_packages(app_state, rx);
-        });
-        handles.push(handle);
-    }
-    {
-        let app_state = app_state.clone();
-        let handle = std::thread::spawn(move || {
-            handle_input(app_state);
-        });
-        handles.push(handle);
-    }
+    handles.extend(setup_frontend(
+        app_state.clone(),
+        package_receiver,
+    ));
 
     for handle in handles {
         handle.join()

@@ -1,6 +1,6 @@
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use crate::types::package::{AppPackage, PackageMessage};
+use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
 
 fn handle_connection(
@@ -8,7 +8,12 @@ fn handle_connection(
     mut stream: TcpStream,
     addr: SocketAddr,
 ) {
-    app_state.ui().system_message(&format!("---New request from {}", addr));
+    app_state
+        .send_package(AppPackage::Alert(AlertPackage {
+            level: AlertPackageLevel::INFO,
+            msg: format!("New request from {}", addr),
+        }))
+        .expect("---Failed to send package");
 
     app_state.add_stream(
         addr,
@@ -27,13 +32,20 @@ fn handle_connection(
                     continue;
                 }
 
-                app_state.send_package(AppPackage::Message(PackageMessage {
-                    from: addr,
-                    msg: buf.to_vec(),
-                })).expect("---failed to send msg through channel");
+                app_state
+                    .send_package(AppPackage::Message(MessagePackage {
+                        from: addr,
+                        msg: buf.to_vec(),
+                    }))
+                    .expect("---failed to send msg through channel");
             }
             Err(e) => {
-                app_state.ui().system_message(&format!("---failed to read {}", e))
+                app_state
+                    .send_package(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::ERROR,
+                        msg: format!("Failed to read stream buffer - {}", e),
+                    }))
+                    .expect("---Failed to send package");
             }
         }
     }
@@ -44,7 +56,12 @@ pub fn start_server(
     server_addr: SocketAddr,
 ) {
     let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
-    app_state.ui().system_message(&format!("---Listening on {}", server_addr));
+    app_state
+        .send_package(AppPackage::Alert(AlertPackage {
+            level: AlertPackageLevel::INFO,
+            msg: format!("Listening on {}", server_addr),
+        }))
+        .expect("---Failed to send package");
 
     let mut handles = vec![];
 
@@ -62,7 +79,12 @@ pub fn start_server(
                 handles.push(h);
             },
             Err(e) => {
-                app_state.ui().system_message(&format!("---Failed to establish connection {}", e));
+                app_state
+                    .send_package(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::ERROR,
+                        msg: format!("Failed to accept connection - {}", e),
+                    }))
+                    .expect("---Failed to send package");
             }
         }
     // }
