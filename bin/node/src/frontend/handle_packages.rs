@@ -10,7 +10,7 @@ pub fn handle_packages(
         match package {
             AppPackage::Message(message) => {
                 let msg = String::from_utf8_lossy(&message.msg).to_string();
-                app_state.ui().new_message(&message.from.to_string(), &msg)
+                app_state.ui().new_message(false, &message.from.to_string(), &msg)
             }
             AppPackage::NewConn(conn_data) => {
                 app_state.ui().system_message(&format!("new conn {}", conn_data.addr));

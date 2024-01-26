@@ -11,7 +11,9 @@ pub enum V100 {
     GoUpperLeft,
     ClearLineRight,
     InsertBlankSymbols(usize),
-    InsertBlankLines(usize)
+    InsertBlankLines(usize),
+    // DeleteLines(usize), // doesn't actually work (not the opposite of InsertBlankLines)
+    ClearLine,
 }
 
 impl Display for V100 {
@@ -28,6 +30,8 @@ impl Display for V100 {
             V100::ClearLineRight => "[K".to_string(),
             V100::InsertBlankSymbols(n) => format!("[{}@", n),
             V100::InsertBlankLines(n) => format!("[{}L", n),
+            // V100::DeleteLines(n) => format!("[{}M", n),
+            V100::ClearLine => "[2K".to_string(),
         };
         write!(f, "\x1b{}", str)
     }
