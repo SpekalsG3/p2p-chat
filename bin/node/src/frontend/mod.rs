@@ -4,7 +4,7 @@ use crate::frontend::handle_input::handle_input;
 use crate::frontend::handle_packages::handle_packages;
 use crate::types::package::AppPackage;
 use crate::types::state::AppState;
-use crate::utils::ui::UI;
+use crate::utils::ui::UITerminal;
 
 mod handle_packages;
 mod handle_input;
@@ -14,7 +14,7 @@ pub fn setup_frontend(
     app_state: AppState,
     package_receiver: Receiver<AppPackage>,
 ) -> [JoinHandle<()>; 2] {
-    let ui = UI::new();
+    let ui = UITerminal::new();
 
     [{
         let app_state = app_state.clone();

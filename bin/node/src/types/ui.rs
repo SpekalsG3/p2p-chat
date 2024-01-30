@@ -36,3 +36,24 @@ impl Display for V100 {
         write!(f, "\x1b{}", str)
     }
 }
+
+#[derive(Clone)]
+pub enum ANSIColors {
+    RedText = 31,
+    GreenText = 32,
+    YellowText = 33,
+    BlueText = 34,
+    CyanText = 36,
+    RedBack = 41,
+    GreenBack = 42,
+    YellowBack = 43,
+    BlueBack = 44,
+    CyanBack = 46,
+    None = 0, // remove all modifiers
+}
+
+impl Display for ANSIColors {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\x1b[{}m", self.clone() as u8)
+    }
+}

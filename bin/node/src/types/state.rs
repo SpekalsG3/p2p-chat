@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::mpsc::Sender;
 use anyhow::{anyhow, bail, Context, Result};
 use crate::types::package::AppPackage;
-use crate::utils::ui::UI;
+use crate::utils::ui::UITerminal;
 
 pub(crate) struct AppStateInnerRef {
 }

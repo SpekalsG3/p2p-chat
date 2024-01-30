@@ -9,8 +9,6 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use crate::client::start_client;
-use crate::frontend::handle_input::handle_input;
-use crate::frontend::handle_packages::handle_packages;
 use crate::frontend::setup_frontend;
 use crate::server::handle_connection::start_server;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};

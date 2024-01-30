@@ -11,7 +11,7 @@ pub fn start_client(
     app_state
         .send_package(AppPackage::Alert(AlertPackage {
             level: AlertPackageLevel::INFO,
-            msg: format!("Connected to the server at {}", client_addr),
+            msg: format!("You joined to {}", client_addr),
         }))
         .expect("---Failed to send package");
 

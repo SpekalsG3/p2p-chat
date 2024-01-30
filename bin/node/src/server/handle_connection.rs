@@ -11,7 +11,7 @@ fn handle_connection(
     app_state
         .send_package(AppPackage::Alert(AlertPackage {
             level: AlertPackageLevel::INFO,
-            msg: format!("New request from {}", addr),
+            msg: format!("New join from {}", addr),
         }))
         .expect("---Failed to send package");
 
@@ -28,8 +28,8 @@ fn handle_connection(
         let mut buf = [0; 256];
         match stream.read(&mut buf) {
             Ok(n) => {
-                if n == 0 { // means socket is empty, nothing to read/nothing was sent
-                    continue;
+                if n == 0 { // means socket is empty
+                    break;
                 }
 
                 app_state
@@ -65,7 +65,7 @@ pub fn start_server(
 
     let mut handles = vec![];
 
-    // loop {
+    loop {
         match server.accept() {
             Ok((stream, addr)) => {
                 let app_state = app_state.clone();
@@ -87,7 +87,7 @@ pub fn start_server(
                     .expect("---Failed to send package");
             }
         }
-    // }
+    }
 
     for h in handles {
         h.join().expect("---failed to join");

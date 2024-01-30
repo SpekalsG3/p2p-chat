@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "bin/node",
+    "bin/testing",
 ]
 
 [workspace.package]
