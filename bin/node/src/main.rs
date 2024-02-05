@@ -1,8 +1,9 @@
-mod server;
-mod client;
-mod types;
 mod frontend;
+mod protocol;
+mod server;
+mod types;
 mod utils;
+mod client;
 
 use std::env::args;
 use std::net::SocketAddr;

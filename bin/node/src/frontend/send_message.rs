@@ -2,7 +2,7 @@ use std::io::{stdout, Write};
 use std::net::SocketAddr;
 use crate::types::package::AlertPackageLevel;
 use crate::types::state::AppState;
-use crate::types::ui::{V100, ANSIColors};
+use crate::types::ui::V100;
 use crate::utils::ui::UITerminal;
 
 pub fn send_message(

@@ -1,8 +1,8 @@
 use std::fmt::Display;
 use std::io::{stdout, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
-use crate::types::ui::{ANSIColors, V100};
+use std::sync::Arc;
+use crate::types::ui::V100;
 
 struct UITerminalInner {
     last_index: AtomicUsize,

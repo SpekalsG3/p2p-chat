@@ -1,5 +1,6 @@
-use std::io::Read;
+use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
+use crate::protocol::read_stream::protocol_read_stream;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
 
@@ -25,27 +26,9 @@ pub fn start_client(
         lock.selected_room = Some(client_addr)
     }
 
-    loop {
-        let mut buf = [0; 256];
-        match client.read(&mut buf) {
-            Ok(n) => {
-                if n == 0 { // means socket is empty, nothing to read/nothing was sent
-                    continue;
-                }
-
-                app_state.send_package(AppPackage::Message(MessagePackage {
-                    from: client_addr,
-                    msg: buf.to_vec(),
-                })).expect("---failed to send msg through channel");
-            }
-            Err(e) => {
-                app_state
-                    .send_package(AppPackage::Alert(AlertPackage {
-                        level: AlertPackageLevel::ERROR,
-                        msg: format!("Failed to read stream - {}", e),
-                    }))
-                    .expect("---Failed to send package");
-            }
-        }
-    }
+    protocol_read_stream(
+        &app_state,
+        client_addr,
+        client,
+    );
 }
