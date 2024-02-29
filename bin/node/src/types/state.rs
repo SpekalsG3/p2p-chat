@@ -4,7 +4,8 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, RwLock};
 use std::sync::mpsc::Sender;
 use anyhow::{anyhow, bail, Context, Result};
-use crate::protocol::{PROT_OPCODE_DATA, protocol_encode_frames};
+use crate::protocol::encode_frame_data::protocol_encode_frame_data;
+use crate::protocol::vars::PROT_OPCODE_DATA;
 use crate::types::package::AppPackage;
 
 pub(crate) struct AppStateInnerRef {
@@ -48,7 +49,7 @@ impl AppState {
     }
 
     pub fn send_stream_message(&self, addr: &SocketAddr, message: &[u8]) -> Result<()> {
-        let chunks = protocol_encode_frames(PROT_OPCODE_DATA, message);
+        let chunks = protocol_encode_frame_data(PROT_OPCODE_DATA, message);
 
         let lock = self.0.m.write().map_err(|e| anyhow!("---Failed to acquire read lock: {}", e.to_string()))?;
         let mut stream = match lock.streams.get(addr) {

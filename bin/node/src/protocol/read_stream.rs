@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use crate::protocol::{PROTOCOL_BUF_SIZE, protocol_parse_frame, ProtocolAction};
+use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction};
+use super::decode_frame::protocol_decode_frame;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
 
@@ -19,7 +20,7 @@ pub fn protocol_read_stream(
                     break;
                 }
 
-                let res = protocol_parse_frame(&mut buf, frame)
+                let res = protocol_decode_frame(&mut buf, frame)
                     .expect("Failed to parse protocol frame");
                 match res {
                     ProtocolAction::None => {
