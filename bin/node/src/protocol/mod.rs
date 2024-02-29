@@ -58,7 +58,7 @@ pub fn protocol_encode_frames(
 
 pub fn protocol_parse_frame(
     buf: &mut Vec<u8>,
-    mut frame: [u8; PROTOCOL_BUF_SIZE],
+    frame: [u8; PROTOCOL_BUF_SIZE],
 ) -> Result<ProtocolAction> {
     let fin = frame[0] >> 7;
     let rsv = (frame[0] << 1) >> 5;

@@ -52,8 +52,4 @@ pub fn handle_input(
             handles.push(h); // later will add proper shutdown
         }
     }
-
-    for h in handles {
-        h.join().expect("---failed to join");
-    }
 }

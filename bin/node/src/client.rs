@@ -1,14 +1,13 @@
-use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
 use crate::protocol::read_stream::protocol_read_stream;
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
+use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
 
 pub fn start_client(
     app_state: AppState,
     client_addr: SocketAddr,
 ) {
-    let mut client = TcpStream::connect(client_addr).expect("---Failed to connect");
+    let client = TcpStream::connect(client_addr).expect("---Failed to connect");
     app_state
         .send_package(AppPackage::Alert(AlertPackage {
             level: AlertPackageLevel::INFO,

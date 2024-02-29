@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use crate::protocol::read_stream::protocol_read_stream;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
@@ -6,7 +5,7 @@ use crate::types::state::AppState;
 
 fn handle_connection(
     app_state: AppState,
-    mut stream: TcpStream,
+    stream: TcpStream,
     addr: SocketAddr,
 ) {
     app_state
@@ -68,9 +67,5 @@ pub fn start_server(
                     .expect("---Failed to send package");
             }
         }
-    }
-
-    for h in handles {
-        h.join().expect("---failed to join");
     }
 }

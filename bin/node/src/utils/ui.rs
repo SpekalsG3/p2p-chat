@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::io::{stdout, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+#[allow(unused)]
 pub enum V100 {
     MoveWindowUp,
     MoveWindowDown,
@@ -37,6 +38,7 @@ impl Display for V100 {
     }
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 pub enum ANSIColors {
     RedText = 31,

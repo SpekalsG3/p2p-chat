@@ -15,7 +15,7 @@ pub(crate) struct AppStateInnerMut {
     packager_sender: Sender<AppPackage>,
 }
 pub(crate) struct AppStateInner {
-    r: AppStateInnerRef,
+    _r: AppStateInnerRef,
     pub(crate) m: RwLock<AppStateInnerMut>,
 }
 
@@ -26,7 +26,7 @@ impl AppState {
         package_sender: Sender<AppPackage>,
     ) -> Self {
         Self(Arc::new(AppStateInner {
-            r: AppStateInnerRef {
+            _r: AppStateInnerRef {
             },
             m: RwLock::new(AppStateInnerMut {
                 selected_room: None,
@@ -50,7 +50,7 @@ impl AppState {
     pub fn send_stream_message(&self, addr: &SocketAddr, message: &[u8]) -> Result<()> {
         let chunks = protocol_encode_frames(PROT_OPCODE_DATA, message);
 
-        let mut lock = self.0.m.write().map_err(|e| anyhow!("---Failed to acquire read lock: {}", e.to_string()))?;
+        let lock = self.0.m.write().map_err(|e| anyhow!("---Failed to acquire read lock: {}", e.to_string()))?;
         let mut stream = match lock.streams.get(addr) {
             Some(s) => s,
             None => {
