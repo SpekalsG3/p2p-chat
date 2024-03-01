@@ -2,7 +2,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use anyhow::{anyhow, Context};
-use crate::protocol::ping_pong::start_pinging;
+use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::{AppState, MetaData};
