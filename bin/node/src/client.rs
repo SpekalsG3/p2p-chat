@@ -8,7 +8,7 @@ use crate::types::state::AppState;
 pub fn start_client(
     app_state: AppState,
     addr: SocketAddr,
-) -> [JoinHandle<()>; 2] {
+) -> [JoinHandle<()>; 1] {
     let stream = TcpStream::connect(addr).expect("---Failed to connect");
 
     {
@@ -29,14 +29,6 @@ pub fn start_client(
         AppState::set_selected_room(&mut lock, Some(addr));
     }
 
-    let ping_handle = {
-        let app_state = app_state.clone();
-        std::thread::spawn(move || {
-            start_pinging(app_state, addr)
-        })
-    };
-
-
     let read_handle = {
         let app_state = app_state.clone();
         std::thread::spawn(move || {
@@ -48,5 +40,5 @@ pub fn start_client(
         })
     };
 
-    [ping_handle, read_handle]
+    [read_handle]
 }
