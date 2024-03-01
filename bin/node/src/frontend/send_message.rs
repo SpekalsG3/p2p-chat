@@ -38,8 +38,8 @@ pub fn send_message(
     };
 
     let frame = protocol_encode_frame_data(PROT_OPCODE_DATA, message.as_bytes());
-    if let Err(e) = app_state
-        .send_stream_message(&addr, frame) {
+    let mut lock = app_state.write_lock().expect("---Failed to acquire write lock");
+    if let Err(e) = AppState::send_stream_message(&mut lock, &addr, frame) {
         ui.new_message(
             &format!("System: {}", AlertPackageLevel::ERROR),
             &format!("Failed to send message #{} - {}", index, e),

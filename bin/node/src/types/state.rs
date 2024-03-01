@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::mpsc::Sender;
 use std::time::{Duration, SystemTime};
 use anyhow::{anyhow, bail, Context, Result};
@@ -17,13 +17,12 @@ pub struct MetaData {
 pub(crate) struct AppStateInnerRef {}
 pub(crate) struct AppStateInnerMut {
     package_sender: Sender<AppPackage>,
-    first_stream: Option<SocketAddr>,
     pub(crate) streams: HashMap<SocketAddr, (TcpStream, MetaData)>,
     selected_room: Option<SocketAddr>,
 }
 pub(crate) struct AppStateInner {
     _r: AppStateInnerRef,
-    pub(crate) m: RwLock<AppStateInnerMut>,
+    m: RwLock<AppStateInnerMut>,
 }
 
 pub struct AppState(pub(crate) Arc<AppStateInner>);
@@ -37,45 +36,57 @@ impl AppState {
             },
             m: RwLock::new(AppStateInnerMut {
                 package_sender,
-                first_stream: None,
                 streams: HashMap::new(),
                 selected_room: None,
             }),
         }))
     }
 
-    pub fn get_selected_room(&self) -> Result<Option<SocketAddr>> {
-        Ok(
-            self.0.m
-                .read()
-                .map_err(|e| anyhow!("---Failed to acquire write lock: {}", e.to_string()))?
-                .selected_room
-        )
+    pub fn read_lock(&self) -> Result<RwLockReadGuard<'_, AppStateInnerMut>> {
+        self.0.m.read().map_err(|e| anyhow!(e.to_string()))
     }
 
-    pub fn set_selected_room(&self, room: Option<SocketAddr>) -> Result<()> {
-        let mut lock = self.0.m.write().map_err(|e| anyhow!("---Failed to acquire write lock: {}", e.to_string()))?;
+    pub fn write_lock(&self) -> Result<RwLockWriteGuard<'_, AppStateInnerMut>> {
+        self.0.m.write().map_err(|e| anyhow!(e.to_string()))
+    }
+
+    pub fn get_selected_room(
+        lock: &RwLockReadGuard<'_, AppStateInnerMut>,
+    ) -> Option<SocketAddr> {
+        lock.selected_room
+    }
+
+    pub fn set_selected_room(
+        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
+        room: Option<SocketAddr>,
+    ) {
         lock.selected_room = room;
-        Ok(())
     }
 
-    pub fn add_stream(&self, addr: SocketAddr, stream: TcpStream) -> Result<()> {
-        let mut lock = self.0.m.write().map_err(|e| anyhow!("---Failed to acquire write lock: {}", e.to_string()))?;
+    pub fn add_stream(
+        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
+        addr: SocketAddr,
+        stream: TcpStream,
+    ) {
         lock.streams.insert(addr, (stream, MetaData {
             ping: Duration::from_secs(0),
             ping_started_at: None,
             topology_alpha: 0_f32,
         }));
-        Ok(())
     }
 
-    pub fn send_package(&self, package: AppPackage) -> Result<()> {
-        let lock = self.0.m.read().map_err(|e| anyhow!("---Failed to acquire read lock: {}", e.to_string()))?;
+    pub fn send_package(
+        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
+        package: AppPackage,
+    ) -> Result<()> {
         lock.package_sender.send(package).context("---Failed to send app message")
     }
 
-    pub fn send_stream_message(&self, addr: &SocketAddr, frame: ProtocolFrame) -> Result<()> {
-        let mut lock = self.0.m.write().map_err(|e| anyhow!("---Failed to acquire read lock: {}", e.to_string()))?;
+    pub fn send_stream_message(
+        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
+        addr: &SocketAddr,
+        frame: ProtocolFrame,
+    ) -> Result<()> {
         let (ref mut stream, _) = match lock.streams.get_mut(addr) {
             Some(s) => s,
             None => {

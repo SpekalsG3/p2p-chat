@@ -46,12 +46,17 @@ fn main() {
     let app_state = AppState::new(package_sender);
     let mut handles = vec![];
 
-    app_state
-        .send_package(AppPackage::Alert(AlertPackage {
-            level: AlertPackageLevel::INFO,
-            msg: "Init threads".to_string(),
-        }))
-        .expect("---Failed to send package");
+    {
+        let mut lock = app_state.write_lock().expect("Failed to get write lock");
+        AppState::send_package(
+            &mut lock,
+            AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::INFO,
+                msg: "Init threads".to_string(),
+            }),
+        )
+            .expect("---Failed to send package");
+    }
 
     if let Some(server_addr) = server_addr {
         let app_state = app_state.clone();

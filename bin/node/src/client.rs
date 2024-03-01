@@ -8,21 +8,24 @@ pub fn start_client(
     client_addr: SocketAddr,
 ) {
     let client = TcpStream::connect(client_addr).expect("---Failed to connect");
-    app_state
-        .send_package(AppPackage::Alert(AlertPackage {
+
+    {
+        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+        AppState::send_package(&mut lock, AppPackage::Alert(AlertPackage {
             level: AlertPackageLevel::INFO,
             msg: format!("You joined to {}", client_addr),
-        }))
-        .expect("---Failed to send package");
+        })).expect("---Failed to send app message");
 
-    app_state.add_stream(
-        client_addr,
-        client.try_clone().expect("---Failed to clone tcp stream"),
-    ).expect("---Failed to save stream to state");
+        AppState::add_stream(
+            &mut lock,
+            client_addr,
+            client.try_clone().expect("---Failed to clone tcp stream"),
+        );
 
-    // todo: it's hardcode, provide choice to the user to change rooms
-    app_state.set_selected_room(Some(client_addr))
-        .expect("---Failed to set_selected_room");
+        // todo: it's hardcode, provide choice to the user to change rooms
+        AppState::set_selected_room(&mut lock, Some(client_addr));
+    }
 
     protocol_read_stream(
         app_state,

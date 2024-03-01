@@ -13,9 +13,7 @@ pub fn start_pinging(
 ) {
     loop {
         {
-            let mut lock = app_state.0.m
-                .write()
-                .expect("Failed to acquire lock");
+            let mut lock = app_state.write_lock().expect("---Failed to acquire write lock");
             let (ref mut stream, ref mut metadata) = lock
                 .streams
                 .get_mut(&addr)

@@ -28,18 +28,19 @@ pub fn protocol_read_stream(
                         continue
                     },
                     ProtocolAction::UseBuffer => {
-                        app_state
-                            .send_package(AppPackage::Message(MessagePackage {
+                        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+                        AppState::send_package(
+                            &mut lock,
+                            AppPackage::Message(MessagePackage {
                                 from: addr,
                                 msg: buf.clone(),
-                            }))
+                            }),
+                        )
                             .expect("---failed to send msg through channel");
                         buf.clear();
                     },
                     ProtocolAction::CloseConnection => {
-                        let mut lock = app_state.0.m
-                            .write()
-                            .expect("Failed to acquire lock");
+                        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
                         let (ref mut stream, _) = lock
                             .streams
@@ -55,9 +56,7 @@ pub fn protocol_read_stream(
                         stream.write(&s).expect("Failed to write");
                     }
                     ProtocolAction::MeasurePing => {
-                        let mut lock = app_state.0.m
-                            .write()
-                            .expect("Failed to acquire lock");
+                        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
                         let (_, ref mut metadata) = lock
                             .streams
@@ -72,11 +71,14 @@ pub fn protocol_read_stream(
                 }
             }
             Err(e) => {
-                app_state
-                    .send_package(AppPackage::Alert(AlertPackage {
+                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+                AppState::send_package(
+                    &mut lock,
+                    AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::ERROR,
                         msg: format!("Failed to read stream - {}", e),
-                    }))
+                    }),
+                )
                     .expect("---Failed to send package");
             }
         }

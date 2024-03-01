@@ -31,10 +31,11 @@ pub fn handle_input(
             continue
         }
 
-        let app_state = app_state.clone();
-        let addr = app_state.get_selected_room().expect("---Failed to get_selected_room");
-        if let Some(addr) = addr {
+        let lock = app_state.read_lock().expect("---Failed to acquire read lock");
+        if let Some(addr) = AppState::get_selected_room(&lock) {
             let ui = ui.clone();
+            let app_state = app_state.clone();
+
             let h = std::thread::spawn(move || {
                 send_message(
                     app_state,
@@ -43,6 +44,7 @@ pub fn handle_input(
                     addr,
                 )
             });
+
             handles.push(h); // later will add proper shutdown
         }
     }
