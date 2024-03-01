@@ -1,14 +1,16 @@
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
+use crate::protocol::encode_frame_data::protocol_encode_frame_data;
 use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
+use crate::protocol::vars::{PROT_OPCODE_UPD_TOPOLOGY, TopologyUpdate};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
 
 fn handle_connection(
     app_state: &AppState,
     addr: SocketAddr,
-    stream: TcpStream,
+    mut stream: TcpStream,
 ) -> [JoinHandle<()>; 2] {
     let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
@@ -25,6 +27,20 @@ fn handle_connection(
 
     // todo: it's hardcode, provide choice to the user to change rooms
     AppState::set_selected_room(&mut lock, Some(addr));
+
+    {
+        let another_conn = lock.streams.iter().find(|(k, _)| k.eq(&&addr));
+
+        if let Some((addr, _)) = another_conn {
+            let mut v = Vec::with_capacity(7);
+            v.extend(TopologyUpdate::Connect(addr.clone()).into_bytes().expect("Failed to convert"));
+            let frame = protocol_encode_frame_data(
+                PROT_OPCODE_UPD_TOPOLOGY,
+                &v,
+            );
+            frame.send_to_stream(&mut stream).expect("---Failed to send frame");
+        }
+    }
 
     let ping_handle = {
         let app_state = app_state.clone();
