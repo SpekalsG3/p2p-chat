@@ -4,12 +4,14 @@ mod server;
 mod types;
 mod utils;
 mod client;
+mod commands;
 
 use std::env::args;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use crate::client::start_client;
+use crate::commands::command_processor;
 use crate::frontend::setup_frontend;
 use crate::server::handle_connection::start_server;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
@@ -43,27 +45,31 @@ fn main() {
     };
 
     let (package_sender, package_receiver) = channel();
-    let app_state = AppState::new(package_sender);
+    let (command_sender, command_receiver) = channel();
+
+    let app_state = AppState::new(
+        command_sender,
+        package_sender,
+    );
     let mut handles = vec![];
 
     {
-        let mut lock = app_state.write_lock().expect("Failed to get write lock");
-        AppState::send_package(
-            &mut lock,
-            AppPackage::Alert(AlertPackage {
+        let lock = app_state.write_lock().expect("Failed to get write lock");
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
                 level: AlertPackageLevel::INFO,
                 msg: "Init threads".to_string(),
-            }),
-        )
-            .expect("---Failed to send package");
+            }))
+            .expect("---Failed to send app package");
     }
+
 
     if let Some(server_addr) = server_addr {
         let app_state = app_state.clone();
-        let handle = std::thread::spawn(move || {
-            start_server(app_state, server_addr)
-        });
-        handles.push(handle);
+        if let Some(handle) = start_server(app_state, server_addr) {
+            handles.push(handle);
+        }
     }
     if let Some(client_addr) = client_addr {
         let app_state = app_state.clone();
@@ -73,6 +79,10 @@ fn main() {
     handles.extend(setup_frontend(
         app_state.clone(),
         package_receiver,
+    ));
+    handles.extend(command_processor(
+        app_state.clone(),
+        command_receiver,
     ));
 
     for handle in handles {

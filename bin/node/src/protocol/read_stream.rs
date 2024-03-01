@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::time::SystemTime;
+use crate::commands::NodeCommand;
 use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction, ProtocolBufferType};
 use super::decode_frame::protocol_decode_frame;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
@@ -33,17 +34,16 @@ pub fn protocol_read_stream(
                         continue
                     }
                     ProtocolAction::UseBuffer => {
-                        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+                        let lock = app_state.write_lock().expect("---Failed to get write lock");
                         match buf_type {
                             ProtocolBufferType::Data => {
-                                AppState::send_package(
-                                    &mut lock,
-                                    AppPackage::Message(MessagePackage {
+                                lock
+                                    .package_sender
+                                    .send(AppPackage::Message(MessagePackage {
                                         from: addr,
                                         msg: buf.clone(),
-                                    }),
-                                )
-                                    .expect("---failed to send msg through channel");
+                                    }))
+                                    .expect("---Failed to send app package");
                             }
                             ProtocolBufferType::TopologyUpd => {
                                 let mut iter = buf.clone().into_iter();
@@ -61,8 +61,11 @@ pub fn protocol_read_stream(
                                                 iter.next().unwrap(),
                                             ]);
                                             let addr = SocketAddr::new(IpAddr::V4(ip), port);
-                                            // todo: send `global action`-like stuff to local channel to start new client closer to main-thread
-                                            //  will be also reused for user-accessible commands `/connect` `/server`
+
+                                            lock
+                                                .command_sender
+                                                .send(NodeCommand::ClientConnect(addr))
+                                                .expect("---Failed to send NodeCommand");
                                         }
                                         _ => {
                                             panic!("Unknown byte of TopologyUpd Buffer")
@@ -105,15 +108,14 @@ pub fn protocol_read_stream(
                 }
             }
             Err(e) => {
-                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
-                AppState::send_package(
-                    &mut lock,
-                    AppPackage::Alert(AlertPackage {
+                let lock = app_state.write_lock().expect("---Failed to get write lock");
+                lock
+                    .package_sender
+                    .send(AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::ERROR,
                         msg: format!("Failed to read stream - {}", e),
-                    }),
-                )
-                    .expect("---Failed to send package");
+                    }))
+                    .expect("---Failed to send app package");
             }
         }
     }

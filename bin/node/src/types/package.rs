@@ -19,6 +19,7 @@ pub enum AlertPackageLevel {
     DEBUG,
     ERROR,
     INFO,
+    WARNING,
 }
 
 impl Display for AlertPackageLevel {

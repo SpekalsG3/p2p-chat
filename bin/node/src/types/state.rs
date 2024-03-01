@@ -3,7 +3,8 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::mpsc::Sender;
 use std::time::{Duration, SystemTime};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
+use crate::commands::NodeCommand;
 use crate::protocol::encode_frame_data::ProtocolFrame;
 use crate::types::package::AppPackage;
 
@@ -15,7 +16,9 @@ pub struct MetaData {
 
 pub(crate) struct AppStateInnerRef {}
 pub(crate) struct AppStateInnerMut {
-    package_sender: Sender<AppPackage>,
+    pub(crate) command_sender: Sender<NodeCommand>,
+    pub(crate) package_sender: Sender<AppPackage>,
+    pub(crate) server_addr: Option<SocketAddr>,
     pub(crate) streams: HashMap<SocketAddr, (TcpStream, MetaData)>,
     selected_room: Option<SocketAddr>,
 }
@@ -28,13 +31,16 @@ pub struct AppState(pub(crate) Arc<AppStateInner>);
 
 impl AppState {
     pub fn new(
+        command_sender: Sender<NodeCommand>,
         package_sender: Sender<AppPackage>,
     ) -> Self {
         Self(Arc::new(AppStateInner {
             _r: AppStateInnerRef {
             },
             m: RwLock::new(AppStateInnerMut {
+                command_sender,
                 package_sender,
+                server_addr: None,
                 streams: HashMap::new(),
                 selected_room: None,
             }),
@@ -72,13 +78,6 @@ impl AppState {
             ping_started_at: None,
             topology_alpha: 0_f32,
         }));
-    }
-
-    pub fn send_package(
-        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
-        package: AppPackage,
-    ) -> Result<()> {
-        lock.package_sender.send(package).context("---Failed to send app message")
     }
 
     pub fn send_stream_message(

@@ -13,10 +13,13 @@ pub fn start_client(
     {
         let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
-        AppState::send_package(&mut lock, AppPackage::Alert(AlertPackage {
-            level: AlertPackageLevel::INFO,
-            msg: format!("You joined to {}", addr),
-        })).expect("---Failed to send app message");
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::INFO,
+                msg: format!("You joined to {}", addr),
+            }))
+            .expect("---Failed to send app package");
 
         AppState::add_stream(
             &mut lock,

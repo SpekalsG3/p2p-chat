@@ -14,10 +14,13 @@ fn handle_connection(
 ) -> [JoinHandle<()>; 2] {
     let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
-    AppState::send_package(&mut lock, AppPackage::Alert(AlertPackage {
-        level: AlertPackageLevel::INFO,
-        msg: format!("New join from {}", addr),
-    })).expect("---Failed to send app message");
+    lock
+        .package_sender
+        .send(AppPackage::Alert(AlertPackage {
+            level: AlertPackageLevel::INFO,
+            msg: format!("New join from {}", addr),
+        }))
+        .expect("---Failed to send app package");
 
     AppState::add_stream(
         &mut lock,
@@ -63,23 +66,10 @@ fn handle_connection(
     [ping_handle, read_handle]
 }
 
-pub fn start_server(
+fn running_server(
     app_state: AppState,
-    server_addr: SocketAddr,
+    server: TcpListener,
 ) {
-    let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
-    {
-        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
-        AppState::send_package(
-            &mut lock,
-            AppPackage::Alert(AlertPackage {
-                level: AlertPackageLevel::INFO,
-                msg: format!("Listening on {}", server_addr),
-            }),
-        )
-            .expect("---Failed to send package");
-    }
-
     let mut handles = vec![];
 
     loop {
@@ -93,16 +83,56 @@ pub fn start_server(
                 handles.extend(h);
             },
             Err(e) => {
-                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
-                AppState::send_package(
-                    &mut lock,
-                    AppPackage::Alert(AlertPackage {
+                let lock = app_state.write_lock().expect("---Failed to get write lock");
+                lock
+                    .package_sender
+                    .send(AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::ERROR,
                         msg: format!("Failed to accept connection - {}", e),
-                    }),
-                )
-                    .expect("---Failed to send package");
+                    }))
+                    .expect("---Failed to send app package");
             }
         }
     }
+}
+
+pub fn start_server(
+    app_state: AppState,
+    server_addr: SocketAddr,
+) -> Option<JoinHandle<()>> {
+    let server = {
+        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+        if let Some(server_addr) = lock.server_addr {
+            lock
+                .package_sender
+                .send(AppPackage::Alert(AlertPackage {
+                    level: AlertPackageLevel::WARNING,
+                    msg: format!("Server is already running on {}", server_addr),
+                }))
+                .expect("---Failed to send app package");
+
+            return None;
+        }
+
+        let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
+
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::INFO,
+                msg: format!("Listening on {}", server_addr),
+            }))
+            .expect("---Failed to send app package");
+
+        lock.server_addr = Some(server_addr);
+
+        server
+    };
+
+    Some(
+        std::thread::spawn(|| {
+            running_server(app_state, server)
+        })
+    )
 }
