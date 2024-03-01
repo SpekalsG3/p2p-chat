@@ -1,7 +1,6 @@
 use std::net::{SocketAddr, TcpStream};
 use std::thread::JoinHandle;
 use crate::protocol::read_stream::protocol_read_stream;
-use crate::protocol::start_pinging::start_pinging;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
 

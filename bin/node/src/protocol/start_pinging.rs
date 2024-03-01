@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::net::{Shutdown, SocketAddr};
 use std::time::{Duration, SystemTime};
 use crate::protocol::encode_frame_data::protocol_encode_frame_data;
@@ -32,9 +31,7 @@ pub fn start_pinging(
             let frame = protocol_encode_frame_data(PROT_OPCODE_PING, &[]);
 
             metadata.ping_started_at = Some(now);
-            for chunk in frame {
-                stream.write(&chunk).expect("---Failed to write to stream");
-            }
+            frame.send_to_stream(stream).expect("---Failed send frame");
         }
 
         // in the end because we want to start pinging right away

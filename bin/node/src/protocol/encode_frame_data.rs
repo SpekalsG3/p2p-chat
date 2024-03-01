@@ -1,6 +1,27 @@
+use std::io::Write;
+use std::net::TcpStream;
+use std::vec::IntoIter;
+use anyhow::{anyhow, Result};
 use super::vars::{PROT_OPCODE_CONTINUATION, PROTOCOL_BUF_SIZE};
 
-pub type ProtocolFrame = Vec<Vec<u8>>;
+pub struct ProtocolFrame(Vec<Vec<u8>>);
+
+impl ProtocolFrame {
+    pub fn send_to_stream(
+        self,
+        stream: &mut TcpStream,
+    ) -> Result<()> {
+        for chunk in self.0 {
+            stream.write(&chunk).map_err(|e| anyhow!("---Failed to write to stream: {}", e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    pub fn into_iter(self) -> IntoIter<Vec<u8>> {
+        self.0.into_iter()
+    }
+}
 
 pub fn protocol_encode_frame_data(
     opcode: u8,
@@ -38,5 +59,5 @@ pub fn protocol_encode_frame_data(
         }
     }
 
-    result
+    ProtocolFrame(result)
 }

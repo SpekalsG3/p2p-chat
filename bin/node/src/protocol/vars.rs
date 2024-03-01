@@ -11,5 +11,5 @@ pub enum ProtocolAction {
     UseBuffer,
     CloseConnection,
     Send(Vec<u8>),
-    MeasurePing,
+    ReceivedPong,
 }

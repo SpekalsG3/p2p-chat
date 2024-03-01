@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::mpsc::Sender;
@@ -94,11 +93,7 @@ impl AppState {
             }
         };
 
-        for chunk in frame {
-            stream.write(&chunk).map_err(|e| anyhow!("---Failed to write to stream: {}", e.to_string()))?;
-        }
-
-        Ok(())
+        frame.send_to_stream(stream)
     }
 }
 

@@ -39,7 +39,7 @@ pub fn protocol_decode_frame(
             ProtocolAction::Send(chunk)
         },
         PROT_OPCODE_PONG => {
-            ProtocolAction::MeasurePing
+            ProtocolAction::ReceivedPong
         },
         _ => {
             bail!("Unknown opcode")

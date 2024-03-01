@@ -55,7 +55,7 @@ pub fn protocol_read_stream(
                     ProtocolAction::Send(s) => {
                         stream.write(&s).expect("Failed to write");
                     }
-                    ProtocolAction::MeasurePing => {
+                    ProtocolAction::ReceivedPong => {
                         let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
                         let (_, ref mut metadata) = lock
