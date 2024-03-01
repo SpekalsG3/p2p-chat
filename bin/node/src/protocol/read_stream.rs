@@ -8,7 +8,7 @@ use crate::types::state::AppState;
 pub fn protocol_read_stream(
     app_state: &AppState,
     addr: SocketAddr,
-    mut stream: TcpStream,
+    mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
 ) {
     let mut buf = Vec::new();
 

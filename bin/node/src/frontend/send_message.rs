@@ -1,5 +1,7 @@
 use std::io::{stdout, Write};
 use std::net::SocketAddr;
+use crate::protocol::encode_frame_data::protocol_encode_frame_data;
+use crate::protocol::vars::PROT_OPCODE_DATA;
 use crate::types::package::AlertPackageLevel;
 use crate::types::state::AppState;
 use crate::types::ui::V100;
@@ -35,8 +37,9 @@ pub fn send_message(
         index
     };
 
+    let frame = protocol_encode_frame_data(PROT_OPCODE_DATA, message.as_bytes());
     if let Err(e) = app_state
-        .send_stream_message(&addr, message.as_bytes()) {
+        .send_stream_message(&addr, frame) {
         ui.new_message(
             &format!("System: {}", AlertPackageLevel::ERROR),
             &format!("Failed to send message #{} - {}", index, e),

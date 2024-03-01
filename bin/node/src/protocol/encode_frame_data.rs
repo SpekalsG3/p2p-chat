@@ -1,9 +1,11 @@
 use super::vars::{PROT_OPCODE_CONTINUATION, PROTOCOL_BUF_SIZE};
 
+pub type ProtocolFrame = Vec<Vec<u8>>;
+
 pub fn protocol_encode_frame_data(
     opcode: u8,
     data: &[u8],
-) -> Vec<Vec<u8>> {
+) -> ProtocolFrame {
     const PAYLOAD_SIZE: usize = PROTOCOL_BUF_SIZE - 1;
 
     let len = data.len();

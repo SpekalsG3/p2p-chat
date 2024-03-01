@@ -32,13 +32,7 @@ pub fn handle_input(
         }
 
         let app_state = app_state.clone();
-        let addr = {
-            app_state.0.m
-                .read()
-                .expect("---failed to take read lock")
-                .selected_room
-                .clone()
-        };
+        let addr = app_state.get_selected_room().expect("---Failed to get_selected_room");
         if let Some(addr) = addr {
             let ui = ui.clone();
             let h = std::thread::spawn(move || {
