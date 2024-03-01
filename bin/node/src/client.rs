@@ -25,7 +25,7 @@ pub fn start_client(
         .expect("---Failed to set_selected_room");
 
     protocol_read_stream(
-        &app_state,
+        app_state,
         client_addr,
         client,
     );

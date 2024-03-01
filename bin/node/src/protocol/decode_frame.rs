@@ -14,9 +14,9 @@ pub fn protocol_decode_frame(
     buf: &mut Vec<u8>,
     frame: [u8; PROTOCOL_BUF_SIZE],
 ) -> anyhow::Result<ProtocolAction> {
-    let fin = frame[0] >> 7;
-    let rsv = (frame[0] << 1) >> 5;
-    let opcode = (frame[0] << 1) >> 1;
+    let fin = frame[0] >> 7; // bit
+    let rsv = (frame[0] << 1) >> 5; // 3 bits
+    let opcode = (frame[0] << 1) >> 1; // 4 bits
 
     if rsv != 0 {
         bail!("Unknown usage of reserved bits")
@@ -39,7 +39,7 @@ pub fn protocol_decode_frame(
             ProtocolAction::Send(chunk)
         },
         PROT_OPCODE_PONG => {
-            ProtocolAction::None
+            ProtocolAction::MeasurePing
         },
         _ => {
             bail!("Unknown opcode")

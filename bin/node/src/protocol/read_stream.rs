@@ -1,12 +1,13 @@
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::time::SystemTime;
 use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction};
 use super::decode_frame::protocol_decode_frame;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
 
 pub fn protocol_read_stream(
-    app_state: &AppState,
+    app_state: AppState,
     addr: SocketAddr,
     mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
 ) {
@@ -36,10 +37,37 @@ pub fn protocol_read_stream(
                         buf.clear();
                     },
                     ProtocolAction::CloseConnection => {
+                        let mut lock = app_state.0.m
+                            .write()
+                            .expect("Failed to acquire lock");
+
+                        let (ref mut stream, _) = lock
+                            .streams
+                            .get_mut(&addr)
+                            .expect("Unknown address");
+
+                        stream.shutdown(Shutdown::Both).expect("Failed to shutdown");
+                        lock.streams.remove(&addr);
+
                         break;
                     },
                     ProtocolAction::Send(s) => {
                         stream.write(&s).expect("Failed to write");
+                    }
+                    ProtocolAction::MeasurePing => {
+                        let mut lock = app_state.0.m
+                            .write()
+                            .expect("Failed to acquire lock");
+
+                        let (_, ref mut metadata) = lock
+                            .streams
+                            .get_mut(&addr)
+                            .expect("Unknown address");
+
+                        if metadata.ping_started_at.is_none() {
+                            continue; // haven't requested ping => cannot measure anything
+                        }
+                        metadata.ping = SystemTime::now().duration_since(metadata.ping_started_at.unwrap()).unwrap();
                     }
                 }
             }
