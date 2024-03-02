@@ -1,7 +1,6 @@
 use std::net::{Shutdown, SocketAddr};
 use std::time::{Duration, SystemTime};
-use crate::protocol::encode_frame_data::protocol_encode_frame_data;
-use crate::protocol::vars::PROT_OPCODE_PING;
+use crate::protocol::frames::ProtocolMessage;
 use crate::types::state::AppState;
 
 const PING_INTERVAL: u64 = 2 * 60; // 2 minutes
@@ -28,10 +27,10 @@ pub fn start_pinging(
                 break;
             }
 
-            let frame = protocol_encode_frame_data(PROT_OPCODE_PING, &[]);
-
             metadata.ping_started_at = Some(now);
-            frame.send_to_stream(stream).expect("---Failed send frame");
+            ProtocolMessage::Ping
+                .send_to_stream(stream)
+                .expect("---Failed send frame");
         }
 
         // in the end because we want to start pinging right away

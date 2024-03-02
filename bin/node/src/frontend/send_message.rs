@@ -1,7 +1,6 @@
 use std::io::{stdout, Write};
 use std::net::SocketAddr;
-use crate::protocol::encode_frame_data::protocol_encode_frame_data;
-use crate::protocol::vars::PROT_OPCODE_DATA;
+use crate::protocol::frames::ProtocolMessage;
 use crate::types::package::AlertPackageLevel;
 use crate::types::state::AppState;
 use crate::types::ui::V100;
@@ -37,9 +36,12 @@ pub fn send_message(
         index
     };
 
-    let frame = protocol_encode_frame_data(PROT_OPCODE_DATA, message.as_bytes());
     let mut lock = app_state.write_lock().expect("---Failed to acquire write lock");
-    if let Err(e) = AppState::send_stream_message(&mut lock, &addr, frame) {
+
+    let (ref mut stream, _) = lock.streams.get_mut(&addr).expect("Should have target address saved");
+
+    if let Err(e) = ProtocolMessage::Data(message.as_bytes().to_vec())
+        .send_to_stream(stream) {
         ui.new_message(
             &format!("System: {}", AlertPackageLevel::ERROR),
             &format!("Failed to send message #{} - {}", index, e),

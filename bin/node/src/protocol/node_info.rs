@@ -1,28 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use anyhow::{bail, Context, Result};
 
-pub const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is an continuation of previous unfinished frame
-pub const PROT_OPCODE_CONN_CLOSED:  u8 = 0b0001; // party disconnected // todo: send in case of graceful shutdown
-pub const PROT_OPCODE_PING:         u8 = 0b0010; // checking if connection is still alive
-pub const PROT_OPCODE_PONG:         u8 = 0b0011; // answer if connection is still alive
-pub const PROT_OPCODE_DATA:         u8 = 0b0100; // frame contains application data
-pub const PROT_OPCODE_NODE_INFO:    u8 = 0b0101; // information about other nodes client chooses to connect/disconnect/etc.
-
-pub const PROTOCOL_BUF_SIZE: usize = 256;
-
-pub enum ProtocolBufferType {
-    Data,
-    NodeInfo,
-    Pong,
-}
-pub enum ProtocolAction {
-    None,
-    UpdateBufferType(ProtocolBufferType),
-    UseBuffer,
-    CloseConnection,
-    ReceivedPing,
-}
-
 pub struct NodeInfo {
     pub addr: SocketAddr,
     pub ping: u16,

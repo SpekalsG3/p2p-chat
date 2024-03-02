@@ -1,9 +1,9 @@
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
-use crate::protocol::encode_frame_data::protocol_encode_frame_data;
+use crate::protocol::frames::ProtocolMessage;
 use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
-use crate::protocol::vars::{NodeInfo, PROT_OPCODE_NODE_INFO};
+use crate::protocol::node_info::NodeInfo;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::{AppState, MetaData};
 
@@ -36,18 +36,11 @@ fn handle_connection(
         let another_conn = lock.streams.iter().find(|(k, _)| k.eq(&&addr));
 
         if let Some((targ_addr, (_, targ_metadata))) = another_conn {
-            let mut v = Vec::with_capacity(NodeInfo::BYTES);
-            v.extend(
+            ProtocolMessage::NodeInfo(
                 NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
-                    .into_bytes()
-                    .expect("---Failed to convert NodeInfo to bytes")
-            );
-
-            let frame = protocol_encode_frame_data(
-                PROT_OPCODE_NODE_INFO,
-                &v,
-            );
-            frame.send_to_stream(&mut stream).expect("---Failed to send frame");
+            )
+                .send_to_stream(&mut stream)
+                .expect("---Failed to send protocol message");
 
             conn_metadata.connected_to.push(targ_addr.clone());
         }

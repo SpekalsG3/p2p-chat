@@ -3,9 +3,8 @@ use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::mpsc::Sender;
 use std::time::SystemTime;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use crate::commands::NodeCommand;
-use crate::protocol::encode_frame_data::ProtocolFrame;
 use crate::types::package::AppPackage;
 
 pub struct MetaData {
@@ -67,21 +66,6 @@ impl AppState {
         room: Option<SocketAddr>,
     ) {
         lock.selected_room = room;
-    }
-
-    pub fn send_stream_message(
-        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
-        addr: &SocketAddr,
-        frame: ProtocolFrame,
-    ) -> Result<()> {
-        let (ref mut stream, _) = match lock.streams.get_mut(addr) {
-            Some(s) => s,
-            None => {
-                bail!("No stream for that address");
-            }
-        };
-
-        frame.send_to_stream(stream)
     }
 }
 
