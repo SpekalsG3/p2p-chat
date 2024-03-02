@@ -6,8 +6,13 @@ use crate::server::handle_connection::start_server;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
 
+#[allow(unused)]
 pub enum NodeCommand {
-    ClientConnect(SocketAddr),
+    ClientConnect {
+        src_addr: SocketAddr,
+        src_ping: u16,
+        targ: SocketAddr,
+    },
     ClientDisconnect(SocketAddr),
     ServerStart(SocketAddr),
 }
@@ -20,8 +25,12 @@ fn process_command(
 
     while let Ok(command) = command_receiver.recv() {
         match command {
-            NodeCommand::ClientConnect(addr) => {
-                let h = start_client(app_state.clone(), addr);
+            NodeCommand::ClientConnect { src_addr, targ, src_ping } => {
+                let h = start_client(
+                    app_state.clone(),
+                    targ,
+                    Some((src_addr, src_ping)),
+                );
                 handles.extend(h);
             }
             NodeCommand::ClientDisconnect(addr) => {

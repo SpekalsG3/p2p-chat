@@ -3,9 +3,9 @@ use std::thread::JoinHandle;
 use crate::protocol::encode_frame_data::protocol_encode_frame_data;
 use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
-use crate::protocol::vars::{PROT_OPCODE_UPD_TOPOLOGY, TopologyUpdate};
+use crate::protocol::vars::{NodeInfo, PROT_OPCODE_NODE_INFO};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
-use crate::types::state::AppState;
+use crate::types::state::{AppState, MetaData};
 
 fn handle_connection(
     app_state: &AppState,
@@ -22,11 +22,14 @@ fn handle_connection(
         }))
         .expect("---Failed to send app package");
 
-    AppState::add_stream(
-        &mut lock,
-        addr,
+    lock.streams.insert(addr, (
         stream.try_clone().expect("---Failed to clone tcp stream"),
-    );
+        MetaData {
+            ping: 0,
+            ping_started_at: None,
+            topology_rad: 0_f32,
+        },
+    ));
 
     // todo: it's hardcode, provide choice to the user to change rooms
     AppState::set_selected_room(&mut lock, Some(addr));
@@ -34,11 +37,16 @@ fn handle_connection(
     {
         let another_conn = lock.streams.iter().find(|(k, _)| k.eq(&&addr));
 
-        if let Some((addr, _)) = another_conn {
-            let mut v = Vec::with_capacity(7);
-            v.extend(TopologyUpdate::Connect(addr.clone()).into_bytes().expect("Failed to convert"));
+        if let Some((addr, (_, metadata))) = another_conn {
+            let mut v = Vec::with_capacity(NodeInfo::BYTES);
+            v.extend(
+                NodeInfo::new(addr.clone(), metadata.ping)
+                    .into_bytes()
+                    .expect("---Failed to convert NodeInfo to bytes")
+            );
+
             let frame = protocol_encode_frame_data(
-                PROT_OPCODE_UPD_TOPOLOGY,
+                PROT_OPCODE_NODE_INFO,
                 &v,
             );
             frame.send_to_stream(&mut stream).expect("---Failed to send frame");

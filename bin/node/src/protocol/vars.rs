@@ -1,4 +1,4 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use anyhow::{bail, Result};
 
 pub const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is an continuation of previous unfinished frame
@@ -6,13 +6,13 @@ pub const PROT_OPCODE_CONN_CLOSED:  u8 = 0b0001; // party disconnected // todo: 
 pub const PROT_OPCODE_PING:         u8 = 0b0010; // checking if connection is still alive
 pub const PROT_OPCODE_PONG:         u8 = 0b0011; // answer if connection is still alive
 pub const PROT_OPCODE_DATA:         u8 = 0b0100; // frame contains application data
-pub const PROT_OPCODE_UPD_TOPOLOGY: u8 = 0b0101; // request to connect/reconnect/disconnect to provided IPs
+pub const PROT_OPCODE_NODE_INFO:    u8 = 0b0101; // information about other nodes client chooses to connect/disconnect/etc.
 
 pub const PROTOCOL_BUF_SIZE: usize = 256;
 
 pub enum ProtocolBufferType {
     Data,
-    TopologyUpd,
+    NodeInfo,
 }
 pub enum ProtocolAction {
     None,
@@ -23,34 +23,72 @@ pub enum ProtocolAction {
     ReceivedPong,
 }
 
-pub enum TopologyUpdate {
-    Connect(SocketAddr),
+pub struct NodeInfo {
+    pub addr: SocketAddr,
+    pub ping: u16,
 }
 
-impl<'a> TopologyUpdate {
+impl<'a> NodeInfo {
+    pub fn new (addr: SocketAddr, ping: u16) -> Self {
+        Self {
+            addr,
+            ping,
+        }
+    }
+
+    pub const BYTES: usize = 8;
+
     pub fn into_bytes(self) -> Result<Vec<u8>> {
-        let bytes = match self {
-            TopologyUpdate::Connect(addr) => {
-                let ip = match addr.ip() {
-                    IpAddr::V4(ip) => ip,
-                    IpAddr::V6(_) => {
-                        bail!("Dont support IPv6");
-                    }
-                };
-                let port = addr.port();
-
-                let mut v = vec![0];
-                v.extend(ip.octets());
-
-                let port_bytes = port.to_be_bytes();
-                if port_bytes.len() != 2 {
-                    bail!("unexpected length of bytes array")
-                }
-                v.extend(port_bytes);
-
-                v
+        let ip = match self.addr.ip() {
+            IpAddr::V4(ip) => ip,
+            IpAddr::V6(_) => {
+                bail!("Dont support IPv6");
             }
         };
-        Ok(bytes)
+        let port = self.addr.port();
+
+        let mut v = Vec::with_capacity(Self::BYTES);
+        v.extend(ip.octets());
+
+        let port_bytes = port.to_be_bytes();
+        if port_bytes.len() != 2 { // prevent unexpected update break
+            bail!("unexpected length of bytes array")
+        }
+        v.extend(port_bytes);
+
+        let ping_bytes = self.ping.to_be_bytes();
+        if ping_bytes.len() != 2 { // prevent unexpected update break
+            bail!("unexpected length of bytes array")
+        }
+        v.extend(ping_bytes);
+
+        Ok(v)
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        let mut iter = bytes.into_iter();
+
+        let ip = Ipv4Addr::new(
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+        );
+        let port = u16::from_be_bytes([
+            iter.next().unwrap(),
+            iter.next().unwrap(),
+        ]);
+        let addr = SocketAddr::new(IpAddr::V4(ip), port);
+
+        let ping = {
+            let mut bytes = [0;2];
+            bytes.fill_with(|| iter.next().unwrap());
+            u16::from_be_bytes(bytes)
+        };
+
+        Ok(Self {
+            addr,
+            ping,
+        })
     }
 }

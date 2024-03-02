@@ -1,5 +1,5 @@
 use anyhow::bail;
-use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction, PROT_OPCODE_CONTINUATION, PROT_OPCODE_CONN_CLOSED, PROT_OPCODE_PING, PROT_OPCODE_PONG, PROT_OPCODE_DATA, PROT_OPCODE_UPD_TOPOLOGY, ProtocolBufferType};
+use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction, PROT_OPCODE_CONTINUATION, PROT_OPCODE_CONN_CLOSED, PROT_OPCODE_PING, PROT_OPCODE_PONG, PROT_OPCODE_DATA, PROT_OPCODE_NODE_INFO, ProtocolBufferType};
 use super::encode_frame_data::protocol_encode_frame_data;
 
 pub fn protocol_decode_frame(
@@ -15,13 +15,13 @@ pub fn protocol_decode_frame(
     }
 
     let action = match opcode {
-        PROT_OPCODE_CONTINUATION | PROT_OPCODE_DATA | PROT_OPCODE_UPD_TOPOLOGY => {
+        PROT_OPCODE_CONTINUATION | PROT_OPCODE_DATA | PROT_OPCODE_NODE_INFO => {
             buf.extend_from_slice(&frame[1..PROTOCOL_BUF_SIZE]);
 
             match opcode {
                 PROT_OPCODE_CONTINUATION => ProtocolAction::None,
                 PROT_OPCODE_DATA => ProtocolAction::UpdateBufferType(ProtocolBufferType::Data),
-                PROT_OPCODE_UPD_TOPOLOGY => ProtocolAction::UpdateBufferType(ProtocolBufferType::TopologyUpd),
+                PROT_OPCODE_NODE_INFO => ProtocolAction::UpdateBufferType(ProtocolBufferType::NodeInfo),
                 _ => {
                     unreachable!()
                 },

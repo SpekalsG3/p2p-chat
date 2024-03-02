@@ -73,7 +73,7 @@ fn main() {
     }
     if let Some(client_addr) = client_addr {
         let app_state = app_state.clone();
-        let handle = start_client(app_state, client_addr);
+        let handle = start_client(app_state, client_addr, None);
         handles.extend(handle);
     }
     handles.extend(setup_frontend(

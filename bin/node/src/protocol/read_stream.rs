@@ -1,8 +1,8 @@
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::SystemTime;
 use crate::commands::NodeCommand;
-use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction, ProtocolBufferType};
+use super::vars::{NodeInfo, PROTOCOL_BUF_SIZE, ProtocolAction, ProtocolBufferType};
 use super::decode_frame::protocol_decode_frame;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
@@ -45,32 +45,20 @@ pub fn protocol_read_stream(
                                     }))
                                     .expect("---Failed to send app package");
                             }
-                            ProtocolBufferType::TopologyUpd => {
-                                let mut iter = buf.clone().into_iter();
-                                while let Some(t) = iter.next() {
-                                    match t {
-                                        1 => {
-                                            let ip = Ipv4Addr::new(
-                                                iter.next().unwrap(),
-                                                iter.next().unwrap(),
-                                                iter.next().unwrap(),
-                                                iter.next().unwrap(),
-                                            );
-                                            let port = u16::from_be_bytes([
-                                                iter.next().unwrap(),
-                                                iter.next().unwrap(),
-                                            ]);
-                                            let addr = SocketAddr::new(IpAddr::V4(ip), port);
+                            ProtocolBufferType::NodeInfo => {
+                                let info = NodeInfo::from_bytes(buf.clone()).expect("---Failed to parse NodeInfo");
 
-                                            lock
-                                                .command_sender
-                                                .send(NodeCommand::ClientConnect(addr))
-                                                .expect("---Failed to send NodeCommand");
-                                        }
-                                        _ => {
-                                            panic!("Unknown byte of TopologyUpd Buffer")
-                                        }
-                                    }
+                                if lock.streams.len() < 4 { // todo: move as config variable
+                                    lock
+                                        .command_sender
+                                        .send(NodeCommand::ClientConnect {
+                                            src_addr: info.addr,
+                                            src_ping: info.ping,
+                                            targ: addr,
+                                        })
+                                        .expect("---Failed to send NodeCommand");
+                                } else {
+                                    // todo: if ping is lower then biggest latency we have, then disconnect and connect to that one
                                 }
                             }
                         }
@@ -103,7 +91,22 @@ pub fn protocol_read_stream(
                         if metadata.ping_started_at.is_none() {
                             continue; // haven't requested ping => cannot measure anything
                         }
-                        metadata.ping = SystemTime::now().duration_since(metadata.ping_started_at.unwrap()).unwrap();
+
+                        let ping = SystemTime::now().duration_since(metadata.ping_started_at.unwrap()).unwrap().as_millis();
+
+                        if ping > 60_000 { // todo: move to constant
+                            lock
+                                .package_sender
+                                .send(AppPackage::Alert(AlertPackage {
+                                    level: AlertPackageLevel::WARNING,
+                                    msg: format!("Ping with host {} is too big ({}). Disconnecting", addr, ping),
+                                }))
+                                .expect("---Failed to send app package");
+                            stream.shutdown(Shutdown::Both).expect("---Failed to shutdown stream");
+                            break;
+                        }
+
+                        metadata.ping = ping as u16;
                     }
                 }
             }
