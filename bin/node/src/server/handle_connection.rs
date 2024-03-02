@@ -22,14 +22,12 @@ fn handle_connection(
         }))
         .expect("---Failed to send app package");
 
-    lock.streams.insert(addr, (
-        stream.try_clone().expect("---Failed to clone tcp stream"),
-        MetaData {
-            ping: 0,
-            ping_started_at: None,
-            topology_rad: 0_f32,
-        },
-    ));
+    let mut conn_metadata = MetaData {
+        ping: 0,
+        ping_started_at: None,
+        topology_rad: 0_f32,
+        connected_to: vec![],
+    };
 
     // todo: it's hardcode, provide choice to the user to change rooms
     AppState::set_selected_room(&mut lock, Some(addr));
@@ -37,10 +35,10 @@ fn handle_connection(
     {
         let another_conn = lock.streams.iter().find(|(k, _)| k.eq(&&addr));
 
-        if let Some((addr, (_, metadata))) = another_conn {
+        if let Some((targ_addr, (_, targ_metadata))) = another_conn {
             let mut v = Vec::with_capacity(NodeInfo::BYTES);
             v.extend(
-                NodeInfo::new(addr.clone(), metadata.ping)
+                NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
                     .into_bytes()
                     .expect("---Failed to convert NodeInfo to bytes")
             );
@@ -50,8 +48,15 @@ fn handle_connection(
                 &v,
             );
             frame.send_to_stream(&mut stream).expect("---Failed to send frame");
+
+            conn_metadata.connected_to.push(targ_addr.clone());
         }
     }
+
+    lock.streams.insert(addr, (
+        stream.try_clone().expect("---Failed to clone tcp stream"),
+        conn_metadata
+    ));
 
     let ping_handle = {
         let app_state = app_state.clone();

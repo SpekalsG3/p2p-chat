@@ -40,12 +40,13 @@ pub fn start_client(
             }))
             .expect("---Failed to send app package");
 
-        let mut stream_metadata = MetaData {
+        let mut targ_metadata = MetaData {
             ping,
             ping_started_at: None,
             topology_rad: 0_f32,
+            connected_to: vec![],
         };
-        let ping = stream_metadata.ping;
+        let ping = targ_metadata.ping;
 
         // todo: it's hardcode, provide choice to the user to change rooms
         AppState::set_selected_room(&mut lock, Some(addr));
@@ -57,12 +58,13 @@ pub fn start_client(
 
             let angle = ((c * c + a * a - b * b) as f32 / (2 * c * a) as f32).acos();
 
-            stream_metadata.topology_rad = angle;
+            targ_metadata.topology_rad = angle;
+            targ_metadata.connected_to.push(src_addr.clone());
         }
 
         lock.streams.insert(addr, (
             stream.try_clone().expect("---Failed to clone tcp stream"),
-            stream_metadata,
+            targ_metadata,
         ));
     }
 
