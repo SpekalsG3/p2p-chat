@@ -1,5 +1,5 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 pub const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is an continuation of previous unfinished frame
 pub const PROT_OPCODE_CONN_CLOSED:  u8 = 0b0001; // party disconnected // todo: send in case of graceful shutdown
@@ -13,14 +13,14 @@ pub const PROTOCOL_BUF_SIZE: usize = 256;
 pub enum ProtocolBufferType {
     Data,
     NodeInfo,
+    Pong,
 }
 pub enum ProtocolAction {
     None,
     UpdateBufferType(ProtocolBufferType),
     UseBuffer,
     CloseConnection,
-    Send(Vec<u8>),
-    ReceivedPong,
+    ReceivedPing,
 }
 
 pub struct NodeInfo {
@@ -69,22 +69,21 @@ impl<'a> NodeInfo {
         let mut iter = bytes.into_iter();
 
         let ip = Ipv4Addr::new(
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
+            iter.next().context("not enough bytes")?,
+            iter.next().context("not enough bytes")?,
+            iter.next().context("not enough bytes")?,
+            iter.next().context("not enough bytes")?,
         );
         let port = u16::from_be_bytes([
-            iter.next().unwrap(),
-            iter.next().unwrap(),
+            iter.next().context("not enough bytes")?,
+            iter.next().context("not enough bytes")?,
         ]);
         let addr = SocketAddr::new(IpAddr::V4(ip), port);
 
-        let ping = {
-            let mut bytes = [0;2];
-            bytes.fill_with(|| iter.next().unwrap());
-            u16::from_be_bytes(bytes)
-        };
+        let ping = u16::from_be_bytes([
+            iter.next().context("not enough bytes")?,
+            iter.next().context("not enough bytes")?,
+        ]);
 
         Ok(Self {
             addr,

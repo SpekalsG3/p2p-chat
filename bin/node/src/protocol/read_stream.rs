@@ -2,10 +2,12 @@ use std::io::{Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::SystemTime;
 use crate::commands::NodeCommand;
-use super::vars::{NodeInfo, PROTOCOL_BUF_SIZE, ProtocolAction, ProtocolBufferType};
+use crate::protocol::encode_frame_data::protocol_encode_frame_data;
+use super::vars::{NodeInfo, PROT_OPCODE_PONG, PROTOCOL_BUF_SIZE, ProtocolAction, ProtocolBufferType};
 use super::decode_frame::protocol_decode_frame;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
 use crate::types::state::AppState;
+use crate::utils::sss_triangle::sss_triangle;
 
 pub fn protocol_read_stream(
     app_state: AppState,
@@ -34,9 +36,9 @@ pub fn protocol_read_stream(
                         continue
                     }
                     ProtocolAction::UseBuffer => {
-                        let lock = app_state.write_lock().expect("---Failed to get write lock");
                         match buf_type {
                             ProtocolBufferType::Data => {
+                                let lock = app_state.read_lock().expect("---Failed to get write lock");
                                 lock
                                     .package_sender
                                     .send(AppPackage::Message(MessagePackage {
@@ -48,6 +50,7 @@ pub fn protocol_read_stream(
                             ProtocolBufferType::NodeInfo => {
                                 let info = NodeInfo::from_bytes(buf.clone()).expect("---Failed to parse NodeInfo");
 
+                                let lock = app_state.read_lock().expect("---Failed to get write lock");
                                 if lock.streams.len() < 4 { // todo: move as config variable
                                     lock
                                         .command_sender
@@ -60,6 +63,47 @@ pub fn protocol_read_stream(
                                 } else {
                                     // todo: if ping is lower then biggest latency we have, then disconnect and connect to that one
                                 }
+                            }
+                            ProtocolBufferType::Pong => {
+                                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+                                let ping_info = if buf.len() > 0 {
+                                    let info = NodeInfo::from_bytes(buf.clone()).expect("---Failed to parse NodeInfo");
+                                    let src_ping = lock.streams.get(&info.addr).expect("src_addr should exist").1.ping;
+                                    Some((src_ping, info.ping))
+                                } else {
+                                    None
+                                };
+
+                                let (_, ref mut metadata) = lock
+                                    .streams
+                                    .get_mut(&addr)
+                                    .expect("Unknown address");
+
+                                if metadata.ping_started_at.is_none() {
+                                    continue; // haven't requested ping => cannot measure anything
+                                }
+
+                                let ping = SystemTime::now().duration_since(metadata.ping_started_at.unwrap()).unwrap().as_millis();
+                                if ping > 60_000 { // todo: move to constant
+                                    lock
+                                        .package_sender
+                                        .send(AppPackage::Alert(AlertPackage {
+                                            level: AlertPackageLevel::WARNING,
+                                            msg: format!("Ping with host {} is too big ({}). Disconnecting", addr, ping),
+                                        }))
+                                        .expect("---Failed to send app package");
+                                    stream.shutdown(Shutdown::Both).expect("---Failed to shutdown stream");
+                                    break;
+                                }
+                                let ping = ping as u16;
+
+                                if let Some((src_ping, targ_ping)) = ping_info {
+                                    metadata.topology_rad = sss_triangle(src_ping, ping, targ_ping);
+                                }
+
+                                metadata.ping = ping;
+                                metadata.ping_started_at = None;
                             }
                         }
                         buf.clear();
@@ -77,36 +121,34 @@ pub fn protocol_read_stream(
 
                         break;
                     },
-                    ProtocolAction::Send(s) => {
-                        stream.write(&s).expect("Failed to write");
-                    }
-                    ProtocolAction::ReceivedPong => {
-                        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+                    ProtocolAction::ReceivedPing => {
+                        let mut buf = vec![];
 
-                        let (_, ref mut metadata) = lock
-                            .streams
-                            .get_mut(&addr)
-                            .expect("Unknown address");
+                        {
+                            let lock = app_state.read_lock().expect("---Failed to get write lock");
+                            let (_, metadata) = lock.streams.get(&addr).expect("entry should exist");
+                            if let Some(targ_addr) = metadata.connected_to.get(0) {
+                                let (_, metadata) = lock
+                                    .streams
+                                    .get(&targ_addr)
+                                    .expect("we should know about it bc `targ_addr` knows about us bc we connected to him");
 
-                        if metadata.ping_started_at.is_none() {
-                            continue; // haven't requested ping => cannot measure anything
+                                buf.extend(
+                                    NodeInfo {
+                                        addr: targ_addr.clone(),
+                                        ping: metadata.ping,
+                                    }.into_bytes()
+                                        .expect("failed to convert to bytes")
+                                )
+                            }
                         }
 
-                        let ping = SystemTime::now().duration_since(metadata.ping_started_at.unwrap()).unwrap().as_millis();
+                        let mut chunks = protocol_encode_frame_data(PROT_OPCODE_PONG, &buf).into_iter();
+                        let chunk = chunks.next().expect("Should be at least one chunk");
 
-                        if ping > 60_000 { // todo: move to constant
-                            lock
-                                .package_sender
-                                .send(AppPackage::Alert(AlertPackage {
-                                    level: AlertPackageLevel::WARNING,
-                                    msg: format!("Ping with host {} is too big ({}). Disconnecting", addr, ping),
-                                }))
-                                .expect("---Failed to send app package");
-                            stream.shutdown(Shutdown::Both).expect("---Failed to shutdown stream");
-                            break;
-                        }
+                        assert_eq!(chunks.next(), None, "Should not be more then one chunk");
 
-                        metadata.ping = ping as u16;
+                        stream.write(&chunk).expect("Failed to write");
                     }
                 }
             }

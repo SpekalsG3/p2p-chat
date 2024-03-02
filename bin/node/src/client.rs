@@ -4,6 +4,7 @@ use std::time::SystemTime;
 use crate::protocol::read_stream::protocol_read_stream;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::{AppState, MetaData};
+use crate::utils::sss_triangle::sss_triangle;
 
 pub fn start_client(
     app_state: AppState,
@@ -56,7 +57,7 @@ pub fn start_client(
             let b = ping;
             let c = lock.streams.get_mut(&src_addr).expect("src_addr should exist").1.ping;
 
-            let angle = ((c * c + a * a - b * b) as f32 / (2 * c * a) as f32).acos();
+            let angle = sss_triangle(c, b, a);
 
             targ_metadata.topology_rad = angle;
             targ_metadata.connected_to.push(src_addr.clone());

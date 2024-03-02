@@ -1,6 +1,5 @@
 use anyhow::bail;
 use super::vars::{PROTOCOL_BUF_SIZE, ProtocolAction, PROT_OPCODE_CONTINUATION, PROT_OPCODE_CONN_CLOSED, PROT_OPCODE_PING, PROT_OPCODE_PONG, PROT_OPCODE_DATA, PROT_OPCODE_NODE_INFO, ProtocolBufferType};
-use super::encode_frame_data::protocol_encode_frame_data;
 
 pub fn protocol_decode_frame(
     buf: &mut Vec<u8>,
@@ -15,13 +14,14 @@ pub fn protocol_decode_frame(
     }
 
     let action = match opcode {
-        PROT_OPCODE_CONTINUATION | PROT_OPCODE_DATA | PROT_OPCODE_NODE_INFO => {
+        PROT_OPCODE_CONTINUATION | PROT_OPCODE_DATA | PROT_OPCODE_NODE_INFO | PROT_OPCODE_PONG => {
             buf.extend_from_slice(&frame[1..PROTOCOL_BUF_SIZE]);
 
             match opcode {
                 PROT_OPCODE_CONTINUATION => ProtocolAction::None,
                 PROT_OPCODE_DATA => ProtocolAction::UpdateBufferType(ProtocolBufferType::Data),
                 PROT_OPCODE_NODE_INFO => ProtocolAction::UpdateBufferType(ProtocolBufferType::NodeInfo),
+                PROT_OPCODE_PONG => ProtocolAction::UpdateBufferType(ProtocolBufferType::Pong),
                 _ => {
                     unreachable!()
                 },
@@ -31,15 +31,7 @@ pub fn protocol_decode_frame(
             ProtocolAction::CloseConnection
         },
         PROT_OPCODE_PING => {
-            let mut chunks = protocol_encode_frame_data(PROT_OPCODE_PONG, &[]).into_iter();
-            let chunk = chunks.next().expect("Should be at least one chunk");
-
-            assert_eq!(chunks.next(), None, "Should not be more then one chunk");
-
-            ProtocolAction::Send(chunk)
-        },
-        PROT_OPCODE_PONG => {
-            ProtocolAction::ReceivedPong
+            ProtocolAction::ReceivedPing
         },
         _ => {
             bail!("Unknown opcode")
