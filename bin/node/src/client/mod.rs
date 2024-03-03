@@ -59,6 +59,14 @@ pub fn start_client(
 
             let angle = sss_triangle(c, b, a);
 
+            lock
+                .package_sender
+                .send(AppPackage::Alert(AlertPackage {
+                    level: AlertPackageLevel::DEBUG,
+                    msg: format!("Calculated angle of {} for {}", angle, src_addr),
+                }))
+                .expect("---Failed to send app package");
+
             targ_metadata.topology_rad = angle;
             targ_metadata.connected_to.push(src_addr.clone());
         }
@@ -67,6 +75,14 @@ pub fn start_client(
             stream.try_clone().expect("---Failed to clone tcp stream"),
             targ_metadata,
         ));
+
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::DEBUG,
+                msg: format!("Connected with delay of {}", ping),
+            }))
+            .expect("---Failed to send app package");
     }
 
     let read_handle = {

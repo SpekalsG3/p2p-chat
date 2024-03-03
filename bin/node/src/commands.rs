@@ -9,9 +9,9 @@ use crate::types::state::AppState;
 #[allow(unused)]
 pub enum NodeCommand {
     ClientConnect {
+        targ_addr: SocketAddr,
+        src_to_targ_ping: u16,
         src_addr: SocketAddr,
-        src_ping: u16,
-        targ: SocketAddr,
     },
     ClientDisconnect(SocketAddr),
     ServerStart(SocketAddr),
@@ -25,11 +25,11 @@ fn process_command(
 
     while let Ok(command) = command_receiver.recv() {
         match command {
-            NodeCommand::ClientConnect { src_addr, targ, src_ping } => {
+            NodeCommand::ClientConnect { targ_addr, src_addr, src_to_targ_ping } => {
                 let h = start_client(
                     app_state.clone(),
-                    targ,
-                    Some((src_addr, src_ping)),
+                    targ_addr,
+                    Some((src_addr, src_to_targ_ping)),
                 );
                 handles.extend(h);
             }

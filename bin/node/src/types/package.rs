@@ -15,7 +15,6 @@ pub struct MessagePackage {
 
 #[derive(Debug)]
 pub enum AlertPackageLevel {
-    #[allow(unused)]
     DEBUG,
     ERROR,
     INFO,

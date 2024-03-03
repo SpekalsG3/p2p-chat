@@ -13,20 +13,8 @@ pub fn protocol_read_stream(
     mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
 ) {
     loop {
-        let message = match ProtocolMessage::from_stream(&mut stream) {
-            Ok(m) => m,
-            Err(e) => {
-                let lock = app_state.write_lock().expect("---Failed to get write lock");
-                lock
-                    .package_sender
-                    .send(AppPackage::Alert(AlertPackage {
-                        level: AlertPackageLevel::ERROR,
-                        msg: format!("Failed to read stream - {}", e),
-                    }))
-                    .expect("---Failed to send app package");
-                break;
-            }
-        };
+        let message = ProtocolMessage::from_stream(&mut stream)
+            .expect("---Failed to read stream");
 
         if message.is_none() {
             break;
@@ -46,13 +34,22 @@ pub fn protocol_read_stream(
             }
             ProtocolMessage::NodeInfo(info) => {
                 let lock = app_state.read_lock().expect("---Failed to get write lock");
+
                 if lock.streams.len() < 4 { // todo: move as config variable
+                    lock
+                        .package_sender
+                        .send(AppPackage::Alert(AlertPackage {
+                            level: AlertPackageLevel::DEBUG,
+                            msg: format!("Connecting to new node {} with src_ping of {}", info.addr, info.ping),
+                        }))
+                        .expect("---Failed to send app package");
+
                     lock
                         .command_sender
                         .send(NodeCommand::ClientConnect {
-                            src_addr: info.addr,
-                            src_ping: info.ping,
-                            targ: addr,
+                            targ_addr: info.addr,
+                            src_to_targ_ping: info.ping,
+                            src_addr: addr,
                         })
                         .expect("---Failed to send NodeCommand");
                 } else {
@@ -92,12 +89,29 @@ pub fn protocol_read_stream(
                 }
                 let ping = ping as u16;
 
-                if let Some((src_ping, targ_ping)) = ping_info {
-                    metadata.topology_rad = sss_triangle(src_ping, ping, targ_ping);
-                }
-
                 metadata.ping = ping;
                 metadata.ping_started_at = None;
+
+                if let Some((src_ping, targ_ping)) = ping_info {
+                    let angle = sss_triangle(src_ping, ping, targ_ping);
+                    metadata.topology_rad = angle;
+
+                    lock
+                        .package_sender
+                        .send(AppPackage::Alert(AlertPackage {
+                            level: AlertPackageLevel::DEBUG,
+                            msg: format!("Calculated angle of {}", angle),
+                        }))
+                        .expect("---Failed to send app package");
+                }
+
+                lock
+                    .package_sender
+                    .send(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::DEBUG,
+                        msg: format!("Received pong, delay is {}", ping),
+                    }))
+                    .expect("---Failed to send app package");
             }
             ProtocolMessage::ConnClosed => {
                 let mut lock = app_state.write_lock().expect("---Failed to get write lock");
@@ -113,9 +127,10 @@ pub fn protocol_read_stream(
                 break;
             },
             ProtocolMessage::Ping => {
+                let lock = app_state.read_lock().expect("---Failed to get write lock");
+                let (_, metadata) = lock.streams.get(&addr).expect("entry should exist");
+
                 let info = {
-                    let lock = app_state.read_lock().expect("---Failed to get write lock");
-                    let (_, metadata) = lock.streams.get(&addr).expect("entry should exist");
                     if let Some(targ_addr) = metadata.connected_to.get(0) {
                         let (_, metadata) = lock
                             .streams
@@ -129,6 +144,14 @@ pub fn protocol_read_stream(
                         None
                     }
                 };
+
+                lock
+                    .package_sender
+                    .send(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::DEBUG,
+                        msg: format!("Received ping, sending pong with info {:?}", info),
+                    }))
+                    .expect("---Failed to send app package");
 
                 ProtocolMessage::Pong(info)
                     .send_to_stream(&mut stream)

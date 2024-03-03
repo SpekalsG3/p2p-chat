@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use anyhow::{bail, Context, Result};
 
+#[derive(Debug)]
 pub struct NodeInfo {
     pub addr: SocketAddr,
     pub ping: u16,
@@ -43,7 +44,7 @@ impl<'a> NodeInfo {
         Ok(v)
     }
 
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Option<Self>> {
         let mut iter = bytes.into_iter();
 
         let ip = Ipv4Addr::new(
@@ -52,6 +53,9 @@ impl<'a> NodeInfo {
             iter.next().context("not enough bytes")?,
             iter.next().context("not enough bytes")?,
         );
+        if ip == Ipv4Addr::new(0,0,0,0) {
+            return Ok(None);
+        }
         let port = u16::from_be_bytes([
             iter.next().context("not enough bytes")?,
             iter.next().context("not enough bytes")?,
@@ -63,9 +67,9 @@ impl<'a> NodeInfo {
             iter.next().context("not enough bytes")?,
         ]);
 
-        Ok(Self {
+        Ok(Some(Self {
             addr,
             ping,
-        })
+        }))
     }
 }

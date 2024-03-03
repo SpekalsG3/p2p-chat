@@ -7,6 +7,7 @@ use anyhow::{anyhow, Result};
 use crate::commands::NodeCommand;
 use crate::types::package::AppPackage;
 
+#[derive(Debug)]
 pub struct MetaData {
     pub(crate) ping: u16,
     pub(crate) ping_started_at: Option<SystemTime>,

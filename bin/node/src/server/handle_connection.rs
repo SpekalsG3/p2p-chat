@@ -33,9 +33,17 @@ fn handle_connection(
     AppState::set_selected_room(&mut lock, Some(addr));
 
     {
-        let another_conn = lock.streams.iter().find(|(k, _)| k.eq(&&addr));
+        let another_conn = lock.streams.iter().find(|(k, _)| !k.eq(&&addr));
 
         if let Some((targ_addr, (_, targ_metadata))) = another_conn {
+            lock
+                .package_sender
+                .send(AppPackage::Alert(AlertPackage {
+                    level: AlertPackageLevel::DEBUG,
+                    msg: format!("Sending info about another node {}", targ_addr),
+                }))
+                .expect("---Failed to send app package");
+
             ProtocolMessage::NodeInfo(
                 NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
             )
@@ -51,13 +59,6 @@ fn handle_connection(
         conn_metadata
     ));
 
-    let ping_handle = {
-        let app_state = app_state.clone();
-        std::thread::spawn(move || {
-            start_pinging(app_state, addr)
-        })
-    };
-
     let read_handle = {
         let app_state = app_state.clone();
         std::thread::spawn(move || {
@@ -66,6 +67,13 @@ fn handle_connection(
                 addr,
                 stream,
             );
+        })
+    };
+
+    let ping_handle = {
+        let app_state = app_state.clone();
+        std::thread::spawn(move || {
+            start_pinging(app_state, addr)
         })
     };
 

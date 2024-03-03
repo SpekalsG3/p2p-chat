@@ -20,6 +20,9 @@ pub enum ProtocolMessage {
     Ping,
     Pong(Option<NodeInfo>),
     Data(Vec<u8>),
+    // todo: i cannot fucking use the same addresses to tell others to connect to
+    //  they are local sockets, not remote
+    //  on connect, server have to receive ip:port where a client will receive connects to
     NodeInfo(NodeInfo),
 }
 
@@ -55,7 +58,7 @@ impl ProtocolMessage {
                             node_info.into_bytes()?
                         );
                     }
-                    None => {},
+                    None => {}
                 }
                 PROT_OPCODE_PONG
             }
@@ -76,28 +79,32 @@ impl ProtocolMessage {
 
         let mut result = Vec::with_capacity(len / Self::FRAME_SIZE + 1);
 
-        for payload_chunk in buf.chunks(Self::PAYLOAD_SIZE) {
-            start += Self::PAYLOAD_SIZE;
+        if len == 0 {
+            result.push(vec![1 << 7 | opcode])
+        } else {
+            for payload_chunk in buf.chunks(Self::PAYLOAD_SIZE) {
+                start += Self::PAYLOAD_SIZE;
 
-            let fin = if start < len {
-                0
-            } else {
-                1
-            };
-            let opcode = if result.len() > 0 {
-                PROT_OPCODE_CONTINUATION
-            } else {
-                opcode
-            };
+                let fin = if start < len {
+                    0
+                } else {
+                    1
+                };
+                let opcode = if result.len() > 0 {
+                    PROT_OPCODE_CONTINUATION
+                } else {
+                    opcode
+                };
 
-            let mut result_chunk = Vec::with_capacity(Self::FRAME_SIZE);
-            result_chunk.push(fin << 7 | opcode);
-            result_chunk.extend_from_slice(payload_chunk);
+                let mut result_chunk = Vec::with_capacity(Self::FRAME_SIZE);
+                result_chunk.push(fin << 7 | opcode);
+                result_chunk.extend_from_slice(payload_chunk);
 
-            result.push(result_chunk);
+                result.push(result_chunk);
 
-            if fin == 1 {
-                break;
+                if fin == 1 {
+                    break;
+                }
             }
         }
 
@@ -126,28 +133,23 @@ impl ProtocolMessage {
                 bail!("Unknown usage of reserved bits")
             }
 
+            let frame = &frame[1..frame.len()];
+
             match opcode {
                 PROT_OPCODE_CONTINUATION => {
-                    buf.extend_from_slice(&frame[1..Self::FRAME_SIZE]);
+                    buf.extend_from_slice(frame);
 
                     if fin == 1 {
                         let msg = match buf_type {
                             ProtocolBufferType::Data => Self::Data(buf),
-                            ProtocolBufferType::NodeInfo => Self::NodeInfo(NodeInfo::from_bytes(buf)?),
-                            ProtocolBufferType::Pong => {
-                                let info = if buf.len() > 0 {
-                                    Some(NodeInfo::from_bytes(buf)?)
-                                } else {
-                                    None
-                                };
-                                Self::Pong(info)
-                            },
+                            ProtocolBufferType::NodeInfo => Self::NodeInfo(NodeInfo::from_bytes(buf)?.expect("opcode has to provide at least one")),
+                            ProtocolBufferType::Pong => Self::Pong(NodeInfo::from_bytes(buf)?),
                         };
                         return Ok(Some(msg));
                     }
                 }
                 PROT_OPCODE_DATA => {
-                    buf.extend_from_slice(&frame[1..Self::FRAME_SIZE]);
+                    buf.extend_from_slice(frame);
 
                     if fin == 1 {
                         let msg = Self::Data(buf);
@@ -157,26 +159,20 @@ impl ProtocolMessage {
                     }
                 }
                 PROT_OPCODE_NODE_INFO => {
-                    buf.extend_from_slice(&frame[1..Self::FRAME_SIZE]);
+                    buf.extend_from_slice(frame);
 
                     if fin == 1 {
-                        let msg = Self::NodeInfo(NodeInfo::from_bytes(buf)?);
+                        let msg = Self::NodeInfo(NodeInfo::from_bytes(buf)?.expect("opcode has to provide at least one"));
                         return Ok(Some(msg));
                     } else {
                         buf_type = ProtocolBufferType::NodeInfo;
                     }
                 }
                 PROT_OPCODE_PONG => {
-                    buf.extend_from_slice(&frame[1..Self::FRAME_SIZE]);
+                    buf.extend_from_slice(frame);
 
                     if fin == 1 {
-                        let info = if buf.len() > 0 {
-                            Some(NodeInfo::from_bytes(buf)?)
-                        } else {
-                            None
-                        };
-
-                        let msg = Self::Pong(info);
+                        let msg = Self::Pong(NodeInfo::from_bytes(buf)?);
                         return Ok(Some(msg));
                     } else {
                         buf_type = ProtocolBufferType::Pong;
