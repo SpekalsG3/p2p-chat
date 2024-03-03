@@ -2,19 +2,17 @@ use std::net::{Shutdown, SocketAddr};
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
 use crate::client::start_client;
-use crate::server::handle_connection::start_server;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::AppState;
 
-#[allow(unused)]
 pub enum NodeCommand {
     ClientConnect {
         targ_addr: SocketAddr,
         src_to_targ_ping: u16,
         src_addr: SocketAddr,
     },
+    #[allow(unused)]
     ClientDisconnect(SocketAddr),
-    ServerStart(SocketAddr),
 }
 
 fn process_command(
@@ -49,11 +47,6 @@ fn process_command(
                             }))
                             .expect("---Failed to send app package");
                     }
-                }
-            }
-            NodeCommand::ServerStart(addr) => {
-                if let Some(h) = start_server(app_state.clone(), addr) {
-                    handles.push(h);
                 }
             }
         }

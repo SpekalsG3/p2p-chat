@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use anyhow::{anyhow, bail, Result};
 use crate::protocol::node_info::NodeInfo;
-use crate::utils::socket_addr_to_bytes::socket_addr_to_bytes;
+use crate::utils::socket_addr_to_bytes::{socket_addr_from_bytes, socket_addr_to_bytes};
 
 const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is an continuation of previous unfinished frame
 const PROT_OPCODE_CONN_INIT:    u8 = 0b0001; // init connection with some data
@@ -13,6 +13,7 @@ const PROT_OPCODE_DATA:         u8 = 0b0101; // frame contains application data
 const PROT_OPCODE_NODE_INFO:    u8 = 0b0110; // information about other nodes client chooses to connect/disconnect/etc.
 
 pub enum ProtocolBufferType {
+    ConnInit,
     Data,
     NodeInfo,
     Pong,
@@ -147,11 +148,32 @@ impl ProtocolMessage {
             let frame = &frame[1..frame.len()];
 
             match opcode {
+                PROT_OPCODE_CONN_INIT => {
+                    buf.extend_from_slice(frame);
+
+                    if fin == 1 {
+                        let mut iter = buf.into_iter();
+                        let server_addr = socket_addr_from_bytes(&mut iter)
+                            .expect("---Failed to parse buffer")
+                            .expect("---Address is required for this opcode");
+                        let msg = Self::ConnInit { server_addr };
+                        return Ok(Some(msg));
+                    } else {
+                        buf_type = ProtocolBufferType::ConnInit;
+                    }
+                }
                 PROT_OPCODE_CONTINUATION => {
                     buf.extend_from_slice(frame);
 
                     if fin == 1 {
                         let msg = match buf_type {
+                            ProtocolBufferType::ConnInit => {
+                                let mut iter = buf.into_iter();
+                                let server_addr = socket_addr_from_bytes(&mut iter)
+                                    .expect("---Failed to parse buffer")
+                                    .expect("---Address is required for this opcode");
+                                Self::ConnInit { server_addr }
+                            }
                             ProtocolBufferType::Data => Self::Data(buf),
                             ProtocolBufferType::NodeInfo => Self::NodeInfo(NodeInfo::from_bytes(buf)?.expect("opcode has to provide at least one")),
                             ProtocolBufferType::Pong => Self::Pong(NodeInfo::from_bytes(buf)?),

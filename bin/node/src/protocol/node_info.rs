@@ -1,6 +1,6 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use anyhow::{bail, Context, Result};
-use crate::utils::socket_addr_to_bytes::socket_addr_to_bytes;
+use crate::utils::socket_addr_to_bytes::{socket_addr_from_bytes, socket_addr_to_bytes};
 
 #[derive(Debug)]
 pub struct NodeInfo {
@@ -35,20 +35,12 @@ impl<'a> NodeInfo {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Option<Self>> {
         let mut iter = bytes.into_iter();
 
-        let ip = Ipv4Addr::new(
-            iter.next().context("not enough bytes")?,
-            iter.next().context("not enough bytes")?,
-            iter.next().context("not enough bytes")?,
-            iter.next().context("not enough bytes")?,
-        );
-        if ip == Ipv4Addr::new(0,0,0,0) {
-            return Ok(None);
-        }
-        let port = u16::from_be_bytes([
-            iter.next().context("not enough bytes")?,
-            iter.next().context("not enough bytes")?,
-        ]);
-        let addr = SocketAddr::new(IpAddr::V4(ip), port);
+        let addr = match socket_addr_from_bytes(&mut iter)? {
+            Some(s) => s,
+            None => {
+                return Ok(None);
+            }
+        };
 
         let ping = u16::from_be_bytes([
             iter.next().context("not enough bytes")?,

@@ -41,13 +41,17 @@ fn main() {
             }
         }
 
-        (server_addr, client_addr)
+        (
+            server_addr.expect("Server is required to run node"),
+            client_addr,
+        )
     };
 
     let (package_sender, package_receiver) = channel();
     let (command_sender, command_receiver) = channel();
 
     let app_state = AppState::new(
+        server_addr,
         command_sender,
         package_sender,
     );
@@ -65,7 +69,7 @@ fn main() {
     }
 
 
-    if let Some(server_addr) = server_addr {
+    {
         let app_state = app_state.clone();
         if let Some(handle) = start_server(app_state, server_addr) {
             handles.push(handle);

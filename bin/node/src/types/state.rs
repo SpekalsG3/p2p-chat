@@ -17,9 +17,9 @@ pub struct MetaData {
 
 pub(crate) struct AppStateInnerRef {}
 pub(crate) struct AppStateInnerMut {
+    pub(crate) server_addr: SocketAddr,
     pub(crate) command_sender: Sender<NodeCommand>,
     pub(crate) package_sender: Sender<AppPackage>,
-    pub(crate) server_addr: Option<SocketAddr>,
     pub(crate) streams: HashMap<SocketAddr, (TcpStream, MetaData)>,
     selected_room: Option<SocketAddr>,
 }
@@ -32,6 +32,7 @@ pub struct AppState(pub(crate) Arc<AppStateInner>);
 
 impl AppState {
     pub fn new(
+        server_addr: SocketAddr,
         command_sender: Sender<NodeCommand>,
         package_sender: Sender<AppPackage>,
     ) -> Self {
@@ -39,9 +40,9 @@ impl AppState {
             _r: AppStateInnerRef {
             },
             m: RwLock::new(AppStateInnerMut {
+                server_addr,
                 command_sender,
                 package_sender,
-                server_addr: None,
                 streams: HashMap::new(),
                 selected_room: None,
             }),

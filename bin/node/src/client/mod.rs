@@ -1,6 +1,7 @@
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::thread::JoinHandle;
 use std::time::SystemTime;
+use crate::protocol::frames::ProtocolMessage;
 use crate::protocol::read_stream::protocol_read_stream;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::{AppState, MetaData};
@@ -11,12 +12,26 @@ pub fn start_client(
     addr: SocketAddr,
     src_info: Option<(SocketAddr, u16)>,
 ) -> Option<JoinHandle<()>> {
-    let ping = SystemTime::now();
-    let stream = TcpStream::connect(addr).expect("---Failed to connect");
-    let ping = SystemTime::now().duration_since(ping).expect("Failed to calculate ping").as_millis();
+    let mut stream = TcpStream::connect(addr).expect("---Failed to connect");
 
     {
         let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+        let ping = SystemTime::now();
+        ProtocolMessage::ConnInit {
+            server_addr: lock.server_addr
+        }
+            .send_to_stream(&mut stream)
+            .expect("---Failed to write to stream");
+        let ping = SystemTime::now().duration_since(ping).expect("Failed to calculate ping").as_millis();
+
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::DEBUG,
+                msg: format!("Sent init message to {} with server_addr {}", addr, lock.server_addr),
+            }))
+            .expect("---Failed to send app package");
 
         // u16 < 2^24 => save to convert to f32
         // src - https://stackoverflow.com/a/41651053
@@ -90,6 +105,7 @@ pub fn start_client(
         std::thread::spawn(move || {
             protocol_read_stream(
                 app_state,
+                addr,
                 stream,
             );
         })

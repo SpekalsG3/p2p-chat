@@ -1,8 +1,94 @@
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
+use crate::protocol::frames::ProtocolMessage;
+use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
+use crate::protocol::node_info::NodeInfo;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
-use crate::types::state::AppState;
+use crate::types::state::{AppState, MetaData};
+
+fn handle_connection(
+    app_state: AppState,
+    mut stream: TcpStream,
+) {
+    let addr;
+    let pinging_handle;
+
+    let first_message = ProtocolMessage::from_stream(&mut stream)
+        .expect("---Failed to read stream")
+        .expect("---Should receive at least init message");
+
+    addr = match first_message {
+        ProtocolMessage::ConnInit { server_addr } => server_addr,
+        _ => {
+            unreachable!("Unexpected first message")
+        }
+    };
+
+    {
+        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::INFO,
+                msg: format!("New join from {}", addr),
+            }))
+            .expect("---Failed to send app package");
+
+        // todo: it's hardcode, provide choice to the user to change rooms
+        AppState::set_selected_room(&mut lock, Some(addr));
+
+        let mut conn_metadata = MetaData {
+            ping: 0,
+            ping_started_at: None,
+            topology_rad: 0_f32,
+            connected_to: vec![],
+        };
+
+        {
+            let another_conn = lock.streams.iter().find(|(k, _)| !k.eq(&&addr));
+
+            if let Some((targ_addr, (_, targ_metadata))) = another_conn {
+                lock
+                    .package_sender
+                    .send(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::DEBUG,
+                        msg: format!("Sending info about another node {}", targ_addr),
+                    }))
+                    .expect("---Failed to send app package");
+
+                ProtocolMessage::NodeInfo(
+                    NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
+                )
+                    .send_to_stream(&mut stream)
+                    .expect("---Failed to send protocol message");
+
+                conn_metadata.connected_to.push(targ_addr.clone());
+            }
+        }
+
+        lock.streams.insert(addr, (
+            stream.try_clone().expect("---Failed to clone tcp stream"),
+            conn_metadata
+        ));
+    }
+
+    {
+        let app_state = app_state.clone();
+        pinging_handle = std::thread::spawn(move || {
+            start_pinging(app_state, addr)
+        })
+    }
+
+    protocol_read_stream(
+        app_state,
+        addr,
+        stream,
+    );
+
+    pinging_handle.join().expect("Should exit gracefully");
+}
 
 fn running_server(
     app_state: AppState,
@@ -16,10 +102,10 @@ fn running_server(
                 let h = {
                     let app_state = app_state.clone();
                     std::thread::spawn(move || {
-                        protocol_read_stream(
+                        handle_connection(
                             app_state,
                             stream,
-                        );
+                        )
                     })
                 };
                 handles.push(h);
@@ -45,18 +131,6 @@ pub fn start_server(
     let server = {
         let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
-        if let Some(server_addr) = lock.server_addr {
-            lock
-                .package_sender
-                .send(AppPackage::Alert(AlertPackage {
-                    level: AlertPackageLevel::WARNING,
-                    msg: format!("Server is already running on {}", server_addr),
-                }))
-                .expect("---Failed to send app package");
-
-            return None;
-        }
-
         let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
 
         lock
@@ -67,7 +141,7 @@ pub fn start_server(
             }))
             .expect("---Failed to send app package");
 
-        lock.server_addr = Some(server_addr);
+        lock.server_addr = server_addr;
 
         server
     };
