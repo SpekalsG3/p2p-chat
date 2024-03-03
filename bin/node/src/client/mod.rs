@@ -90,7 +90,6 @@ pub fn start_client(
         std::thread::spawn(move || {
             protocol_read_stream(
                 app_state,
-                addr,
                 stream,
             );
         })

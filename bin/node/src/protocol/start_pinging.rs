@@ -10,7 +10,7 @@ pub fn start_pinging(
     app_state: AppState,
     addr: SocketAddr,
 ) {
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_secs(1)); // todo: remove, used only for debug
 
     loop {
         {
@@ -27,6 +27,7 @@ pub fn start_pinging(
 
                 stream.shutdown(Shutdown::Both).expect("shutdown failed");
                 lock.streams.remove(&addr);
+
                 break;
             }
 

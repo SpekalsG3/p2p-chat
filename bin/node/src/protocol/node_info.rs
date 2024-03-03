@@ -1,5 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use anyhow::{bail, Context, Result};
+use crate::utils::socket_addr_to_bytes::socket_addr_to_bytes;
 
 #[derive(Debug)]
 pub struct NodeInfo {
@@ -18,22 +19,9 @@ impl<'a> NodeInfo {
     pub const BYTES: usize = 8;
 
     pub fn into_bytes(self) -> Result<Vec<u8>> {
-        let ip = match self.addr.ip() {
-            IpAddr::V4(ip) => ip,
-            IpAddr::V6(_) => {
-                bail!("Dont support IPv6");
-            }
-        };
-        let port = self.addr.port();
-
         let mut v = Vec::with_capacity(Self::BYTES);
-        v.extend(ip.octets());
 
-        let port_bytes = port.to_be_bytes();
-        if port_bytes.len() != 2 { // prevent unexpected update break
-            bail!("unexpected length of bytes array")
-        }
-        v.extend(port_bytes);
+        v.extend(socket_addr_to_bytes(self.addr)?);
 
         let ping_bytes = self.ping.to_be_bytes();
         if ping_bytes.len() != 2 { // prevent unexpected update break

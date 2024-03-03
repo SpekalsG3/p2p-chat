@@ -1,27 +1,114 @@
-use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::net::{Shutdown, TcpStream};
 use std::time::SystemTime;
 use crate::commands::NodeCommand;
 use crate::protocol::frames::ProtocolMessage;
 use crate::protocol::node_info::NodeInfo;
+use crate::protocol::start_pinging::start_pinging;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
-use crate::types::state::AppState;
+use crate::types::state::{AppState, MetaData};
 use crate::utils::sss_triangle::sss_triangle;
 
 pub fn protocol_read_stream(
     app_state: AppState,
-    addr: SocketAddr,
     mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
 ) {
+    let addr;
+    let pinging_handle;
+
+    {
+        let first_message = ProtocolMessage::from_stream(&mut stream)
+            .expect("---Failed to read stream")
+            .expect("---Should receive at least init message");
+
+        addr = match first_message {
+            ProtocolMessage::ConnInit { server_addr } => server_addr,
+            _ => {
+                unreachable!("Unexpected first message")
+            }
+        };
+
+        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+        lock
+            .package_sender
+            .send(AppPackage::Alert(AlertPackage {
+                level: AlertPackageLevel::INFO,
+                msg: format!("New join from {}", addr),
+            }))
+            .expect("---Failed to send app package");
+
+        // todo: it's hardcode, provide choice to the user to change rooms
+        AppState::set_selected_room(&mut lock, Some(addr));
+
+        let mut conn_metadata = MetaData {
+            ping: 0,
+            ping_started_at: None,
+            topology_rad: 0_f32,
+            connected_to: vec![],
+        };
+
+        {
+            let another_conn = lock.streams.iter().find(|(k, _)| !k.eq(&&addr));
+
+            if let Some((targ_addr, (_, targ_metadata))) = another_conn {
+                lock
+                    .package_sender
+                    .send(AppPackage::Alert(AlertPackage {
+                        level: AlertPackageLevel::DEBUG,
+                        msg: format!("Sending info about another node {}", targ_addr),
+                    }))
+                    .expect("---Failed to send app package");
+
+                ProtocolMessage::NodeInfo(
+                    NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
+                )
+                    .send_to_stream(&mut stream)
+                    .expect("---Failed to send protocol message");
+
+                conn_metadata.connected_to.push(targ_addr.clone());
+            }
+        }
+
+        lock.streams.insert(addr, (
+            stream.try_clone().expect("---Failed to clone tcp stream"),
+            conn_metadata
+        ));
+
+        {
+            let app_state = app_state.clone();
+            pinging_handle = std::thread::spawn(move || {
+                start_pinging(app_state, addr)
+            })
+        }
+    };
+
     loop {
         let message = ProtocolMessage::from_stream(&mut stream)
             .expect("---Failed to read stream");
 
         if message.is_none() {
+            // stream has ended = host disconnected
             break;
         }
         let message = message.unwrap();
 
         match message {
+            ProtocolMessage::ConnInit { .. } => {
+                unreachable!("Unexpected protocol message")
+            }
+            ProtocolMessage::ConnClosed => {
+                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+
+                let (ref mut stream, _) = lock
+                    .streams
+                    .get_mut(&addr)
+                    .expect("Unknown address");
+
+                stream.shutdown(Shutdown::Both).expect("Failed to shutdown");
+                lock.streams.remove(&addr);
+
+                break;
+            }
             ProtocolMessage::Data(data) => {
                 let lock = app_state.read_lock().expect("---Failed to get write lock");
                 lock
@@ -113,19 +200,6 @@ pub fn protocol_read_stream(
                     }))
                     .expect("---Failed to send app package");
             }
-            ProtocolMessage::ConnClosed => {
-                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
-
-                let (ref mut stream, _) = lock
-                    .streams
-                    .get_mut(&addr)
-                    .expect("Unknown address");
-
-                stream.shutdown(Shutdown::Both).expect("Failed to shutdown");
-                lock.streams.remove(&addr);
-
-                break;
-            },
             ProtocolMessage::Ping => {
                 let lock = app_state.read_lock().expect("---Failed to get write lock");
                 let (_, metadata) = lock.streams.get(&addr).expect("entry should exist");
@@ -159,4 +233,6 @@ pub fn protocol_read_stream(
             }
         }
     }
+
+    pinging_handle.join().expect("Should exit gracefully");
 }
