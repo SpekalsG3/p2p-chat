@@ -12,18 +12,18 @@ pub fn start_client(
     addr: SocketAddr,
     src_info: Option<(SocketAddr, u16)>,
 ) -> Option<JoinHandle<()>> {
+    let ping = SystemTime::now();
     let mut stream = TcpStream::connect(addr).expect("---Failed to connect");
+    let ping = SystemTime::now().duration_since(ping).expect("Failed to calculate ping").as_millis();
 
     {
         let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
-        let ping = SystemTime::now();
         ProtocolMessage::ConnInit {
             server_addr: lock.server_addr
         }
             .send_to_stream(&mut stream)
             .expect("---Failed to write to stream");
-        let ping = SystemTime::now().duration_since(ping).expect("Failed to calculate ping").as_millis();
 
         lock
             .package_sender
@@ -60,7 +60,7 @@ pub fn start_client(
             ping,
             ping_started_at: None,
             topology_rad: 0_f32,
-            connected_to: vec![],
+            knows_about: vec![],
         };
         let ping = targ_metadata.ping;
 
@@ -83,7 +83,7 @@ pub fn start_client(
                 .expect("---Failed to send app package");
 
             targ_metadata.topology_rad = angle;
-            targ_metadata.connected_to.push(src_addr.clone());
+            targ_metadata.knows_about.push(src_addr.clone());
         }
 
         lock.streams.insert(addr, (

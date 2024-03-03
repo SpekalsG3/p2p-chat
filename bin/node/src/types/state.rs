@@ -12,7 +12,9 @@ pub struct MetaData {
     pub(crate) ping: u16,
     pub(crate) ping_started_at: Option<SystemTime>,
     pub(crate) topology_rad: f32, // angel relative to the first connection, used to determine who's closer to another user
-    pub(crate) connected_to: Vec<SocketAddr>,
+    // vec of address this node knows about for any cross-referencing
+    // (like for topology_rad or to find the path to specific node)
+    pub(crate) knows_about: Vec<SocketAddr>,
 }
 
 pub(crate) struct AppStateInnerRef {}

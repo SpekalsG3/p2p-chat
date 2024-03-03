@@ -43,7 +43,7 @@ fn handle_connection(
             ping: 0,
             ping_started_at: None,
             topology_rad: 0_f32,
-            connected_to: vec![],
+            knows_about: vec![],
         };
 
         {
@@ -64,7 +64,7 @@ fn handle_connection(
                     .send_to_stream(&mut stream)
                     .expect("---Failed to send protocol message");
 
-                conn_metadata.connected_to.push(targ_addr.clone());
+                conn_metadata.knows_about.push(targ_addr.clone());
             }
         }
 

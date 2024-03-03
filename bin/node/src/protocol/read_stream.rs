@@ -138,7 +138,7 @@ pub fn protocol_read_stream(
                 let (_, metadata) = lock.streams.get(&addr).expect("entry should exist");
 
                 let info = {
-                    if let Some(targ_addr) = metadata.connected_to.get(0) {
+                    if let Some(targ_addr) = metadata.knows_about.get(0) {
                         let (_, metadata) = lock
                             .streams
                             .get(&targ_addr)

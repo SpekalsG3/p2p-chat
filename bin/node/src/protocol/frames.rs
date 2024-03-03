@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail, Result};
 use crate::protocol::node_info::NodeInfo;
 use crate::utils::socket_addr_to_bytes::{socket_addr_from_bytes, socket_addr_to_bytes};
 
-const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is an continuation of previous unfinished frame
+const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is a continuation of previous unfinished frame
 const PROT_OPCODE_CONN_INIT:    u8 = 0b0001; // init connection with some data
 const PROT_OPCODE_CONN_CLOSED:  u8 = 0b0010; // party disconnected // todo: send in case of graceful shutdown
 const PROT_OPCODE_PING:         u8 = 0b0011; // checking if connection is still alive
