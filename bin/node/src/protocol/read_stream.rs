@@ -112,8 +112,8 @@ pub fn protocol_read_stream(
                 metadata.ping = ping;
                 metadata.ping_started_at = None;
 
-                if let Some((src_ping, targ_ping)) = ping_info {
-                    let angle = sss_triangle(src_ping, ping, targ_ping);
+                if let Some((src_ping, src_to_targ_ping)) = ping_info {
+                    let angle = sss_triangle(src_ping, ping, src_to_targ_ping);
                     metadata.topology_rad = angle;
 
                     lock
