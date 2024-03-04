@@ -12,7 +12,7 @@ use crate::utils::prng::{Splitmix64, Xoshiro256ss};
 
 #[derive(Debug)]
 pub struct MetaData {
-    pub(crate) ping: u16,
+    pub(crate) ping: u16, // in milliseconds but we check that ping is less then 60000 so it can fit
     pub(crate) ping_started_at: Option<SystemTime>,
     pub(crate) topology_rad: f32, // angel relative to the first connection, used to determine who's closer to another user
     // vec of address this node knows about for any cross-referencing

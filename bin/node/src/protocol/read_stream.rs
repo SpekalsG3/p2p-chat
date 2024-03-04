@@ -1,5 +1,5 @@
 use std::net::{Shutdown, SocketAddr, TcpStream};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use crate::commands::NodeCommand;
 use crate::protocol::frames::ProtocolMessage;
 use crate::protocol::node_info::NodeInfo;
@@ -52,9 +52,13 @@ pub fn protocol_read_stream(
                 }
                 data_id_states.insert(id, ());
 
-                for (targ_addr, (ref mut stream, _)) in streams.iter_mut() {
+                let mut biggest_ping = 0;
+                for (targ_addr, (ref mut stream, ref metadata)) in streams.iter_mut() {
                     if targ_addr == &addr {
                         continue
+                    }
+                    if metadata.ping > biggest_ping {
+                        biggest_ping = metadata.ping;
                     }
 
                     AppState::send_message(
@@ -63,6 +67,21 @@ pub fn protocol_read_stream(
                         ProtocolMessage::Data(id, data.clone()),
                     )
                         .expect("Failed to write to stream");
+                }
+
+                {
+                    let app_state = app_state.clone();
+                    std::thread::spawn(move || {
+                        let ping = if biggest_ping == 0 {
+                            1
+                        } else {
+                            biggest_ping as u64 * 2 // x2 just to be sure
+                        };
+                        std::thread::sleep(Duration::from_millis(ping));
+
+                        let mut lock = app_state.write_lock().expect("Failed to get write lock");
+                        lock.data_id_states.remove(&id);
+                    });
                 }
 
                 lock
