@@ -22,7 +22,7 @@ pub fn protocol_read_stream(
         }
         let (message, frames_count) = message.unwrap();
 
-        let lock = &mut *app_state.write_lock().expect("---Failed to get write lock");
+        let lock = &mut *app_state.lock().expect("---Failed to get write lock");
 
         let streams = &mut lock.streams;
         let state = &mut lock.state;
@@ -79,7 +79,7 @@ pub fn protocol_read_stream(
                         };
                         std::thread::sleep(Duration::from_millis(ping));
 
-                        let mut lock = app_state.write_lock().expect("Failed to get write lock");
+                        let mut lock = app_state.lock().expect("Failed to get write lock");
                         lock.data_id_states.remove(&id);
                     });
                 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::mpsc::Sender;
 use std::time::SystemTime;
 use anyhow::{anyhow, Result};
@@ -31,7 +31,6 @@ impl MetaData {
     }
 }
 
-pub(crate) struct AppStateInnerRef {}
 pub(crate) struct AppStateInnerMut {
     pub(crate) server_addr: SocketAddr,
     pub(crate) command_sender: Sender<NodeCommand>,
@@ -41,8 +40,7 @@ pub(crate) struct AppStateInnerMut {
     pub(crate) data_id_states: HashMap<u64, ()>,
 }
 pub(crate) struct AppStateInner {
-    _r: AppStateInnerRef,
-    m: RwLock<AppStateInnerMut>,
+    m: Mutex<AppStateInnerMut>,
 }
 
 pub struct AppState(pub(crate) Arc<AppStateInner>);
@@ -55,9 +53,7 @@ impl AppState {
         seed: u64,
     ) -> Self {
         Self(Arc::new(AppStateInner {
-            _r: AppStateInnerRef {
-            },
-            m: RwLock::new(AppStateInnerMut {
+            m: Mutex::new(AppStateInnerMut {
                 server_addr,
                 command_sender,
                 package_sender,
@@ -68,12 +64,8 @@ impl AppState {
         }))
     }
 
-    pub fn read_lock(&self) -> Result<RwLockReadGuard<'_, AppStateInnerMut>> {
-        self.0.m.read().map_err(|e| anyhow!(e.to_string()))
-    }
-
-    pub fn write_lock(&self) -> Result<RwLockWriteGuard<'_, AppStateInnerMut>> {
-        self.0.m.write().map_err(|e| anyhow!(e.to_string()))
+    pub fn lock(&self) -> Result<MutexGuard<AppStateInnerMut>> {
+        self.0.m.lock().map_err(|e| anyhow!(e.to_string()))
     }
 
     pub fn send_message(

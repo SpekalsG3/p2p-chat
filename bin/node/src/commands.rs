@@ -32,7 +32,7 @@ fn process_command(
                 handles.extend(h);
             }
             NodeCommand::ClientDisconnect(addr) => {
-                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+                let mut lock = app_state.lock().expect("---Failed to get write lock");
                 match lock.streams.get_mut(&addr) {
                     Some((s, _)) => {
                         s.shutdown(Shutdown::Both).expect("---Failed to shutdown the stream");

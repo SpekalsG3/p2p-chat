@@ -26,7 +26,7 @@ fn handle_connection(
             }
         };
 
-        let lock = &mut *app_state.write_lock().expect("---Failed to get write lock");
+        let lock = &mut *app_state.lock().expect("---Failed to get write lock");
 
         for _ in 0..frames_count {
             lock.state.next();
@@ -114,7 +114,7 @@ fn running_server(
                 handles.push(h);
             },
             Err(e) => {
-                let lock = app_state.write_lock().expect("---Failed to get write lock");
+                let lock = app_state.lock().expect("---Failed to get write lock");
                 lock
                     .package_sender
                     .send(AppPackage::Alert(AlertPackage {
@@ -132,7 +132,7 @@ pub fn start_server(
     server_addr: SocketAddr,
 ) -> Option<JoinHandle<()>> {
     let server = {
-        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+        let mut lock = app_state.lock().expect("---Failed to get write lock");
 
         let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
 

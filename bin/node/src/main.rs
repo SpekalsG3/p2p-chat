@@ -60,7 +60,7 @@ fn main() {
     let mut handles = vec![];
 
     {
-        let lock = app_state.write_lock().expect("Failed to get write lock");
+        let lock = app_state.lock().expect("Failed to get write lock");
         lock
             .package_sender
             .send(AppPackage::Alert(AlertPackage {

@@ -17,7 +17,7 @@ pub fn start_client(
     let ping = SystemTime::now().duration_since(ping).expect("Failed to calculate ping").as_millis();
 
     {
-        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+        let mut lock = app_state.lock().expect("---Failed to get write lock");
 
         let server_addr = lock.server_addr;
         AppState::send_message(

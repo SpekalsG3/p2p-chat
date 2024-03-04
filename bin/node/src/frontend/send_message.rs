@@ -34,7 +34,7 @@ pub fn send_message(
     };
 
     // todo: create some wrapper so that Application does not have to know about Protocol stuff.
-    let lock = &mut *app_state.write_lock().expect("---Failed to acquire write lock");
+    let lock = &mut *app_state.lock().expect("---Failed to acquire write lock");
     let streams = &mut lock.streams;
     let state = &mut lock.state;
 

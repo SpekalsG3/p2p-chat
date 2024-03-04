@@ -14,7 +14,7 @@ pub fn start_pinging(
 
     loop {
         {
-            let lock = &mut *app_state.write_lock().expect("---Failed to acquire write lock");
+            let lock = &mut *app_state.lock().expect("---Failed to acquire write lock");
             let streams = &mut lock.streams;
             let state = &mut lock.state;
 
