@@ -1,7 +1,5 @@
 use std::io::{stdout, Write};
-use std::net::SocketAddr;
 use crate::protocol::frames::ProtocolMessage;
-use crate::types::package::AlertPackageLevel;
 use crate::types::state::AppState;
 use crate::types::ui::V100;
 use crate::utils::ui::UITerminal;
@@ -10,7 +8,6 @@ pub fn send_message(
     app_state: AppState,
     ui: UITerminal,
     message: &str,
-    addr: SocketAddr,
 ) {
     let index = {
         let mut stdout = stdout().lock();
@@ -36,15 +33,20 @@ pub fn send_message(
         index
     };
 
-    let mut lock = app_state.write_lock().expect("---Failed to acquire write lock");
+    // todo: create some wrapper so that Application does not have to know about Protocol stuff.
+    let lock = &mut *app_state.write_lock().expect("---Failed to acquire write lock");
+    let streams = &mut lock.streams;
+    let state = &mut lock.state;
 
-    let (ref mut stream, _) = lock.streams.get_mut(&addr).expect("Should have target address saved");
+    let id = state.next();
+    let data = message.as_bytes().to_vec();
 
-    if let Err(e) = ProtocolMessage::Data(message.as_bytes().to_vec())
-        .send_to_stream(stream) {
-        ui.new_message(
-            &format!("System: {}", AlertPackageLevel::ERROR),
-            &format!("Failed to send message #{} - {}", index, e),
-        );
+    for (_, (ref mut stream, _)) in streams.iter_mut() {
+        AppState::send_message(
+            state,
+            stream,
+            ProtocolMessage::Data(id, data.clone()),
+        )
+            .expect(&format!("Failed to send message #{}", index));
     }
 }

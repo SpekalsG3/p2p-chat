@@ -31,21 +31,17 @@ pub fn handle_input(
             continue
         }
 
-        let lock = app_state.read_lock().expect("---Failed to acquire read lock");
-        if let Some(addr) = AppState::get_selected_room(&lock) {
-            let ui = ui.clone();
-            let app_state = app_state.clone();
+        let ui = ui.clone();
+        let app_state = app_state.clone();
 
-            let h = std::thread::spawn(move || {
-                send_message(
-                    app_state,
-                    ui,
-                    &str,
-                    addr,
-                )
-            });
+        let h = std::thread::spawn(move || {
+            send_message(
+                app_state,
+                ui,
+                &str,
+            )
+        });
 
-            handles.push(h); // later will add proper shutdown
-        }
+        handles.push(h); // later will add proper shutdown
     }
 }

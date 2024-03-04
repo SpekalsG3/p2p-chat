@@ -14,9 +14,11 @@ pub fn start_pinging(
 
     loop {
         {
-            let mut lock = app_state.write_lock().expect("---Failed to acquire write lock");
-            let (ref mut stream, ref mut metadata) = lock
-                .streams
+            let lock = &mut *app_state.write_lock().expect("---Failed to acquire write lock");
+            let streams = &mut lock.streams;
+            let state = &mut lock.state;
+
+            let (ref mut stream, ref mut metadata) = streams
                 .get_mut(&addr)
                 .expect("Unknown address");
 
@@ -26,14 +28,17 @@ pub fn start_pinging(
                 // means host did not respond to last ping = host is dead
 
                 stream.shutdown(Shutdown::Both).expect("shutdown failed");
-                lock.streams.remove(&addr);
+                streams.remove(&addr);
 
                 break;
             }
 
             metadata.ping_started_at = Some(now);
-            ProtocolMessage::Ping
-                .send_to_stream(stream)
+            AppState::send_message(
+                state,
+                stream,
+                ProtocolMessage::Ping
+            )
                 .expect("---Failed send frame");
 
             lock

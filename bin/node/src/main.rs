@@ -50,10 +50,12 @@ fn main() {
     let (package_sender, package_receiver) = channel();
     let (command_sender, command_receiver) = channel();
 
+    let seed = 1234567; // todo: get seed randomly
     let app_state = AppState::new(
         server_addr,
         command_sender,
         package_sender,
+        seed,
     );
     let mut handles = vec![];
 

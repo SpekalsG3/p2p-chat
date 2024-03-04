@@ -1,9 +1,9 @@
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
 use crate::protocol::frames::ProtocolMessage;
+use crate::protocol::node_info::NodeInfo;
 use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
-use crate::protocol::node_info::NodeInfo;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::types::state::{AppState, MetaData};
 
@@ -14,19 +14,23 @@ fn handle_connection(
     let addr;
     let pinging_handle;
 
-    let first_message = ProtocolMessage::from_stream(&mut stream)
-        .expect("---Failed to read stream")
-        .expect("---Should receive at least init message");
-
-    addr = match first_message {
-        ProtocolMessage::ConnInit { server_addr } => server_addr,
-        _ => {
-            unreachable!("Unexpected first message")
-        }
-    };
-
     {
-        let mut lock = app_state.write_lock().expect("---Failed to get write lock");
+        let (first_message, frames_count) = ProtocolMessage::from_stream(&mut stream)
+            .expect("---Failed to read stream")
+            .expect("---Should receive at least init message");
+
+        addr = match first_message {
+            ProtocolMessage::ConnInit { server_addr } => server_addr,
+            _ => {
+                unreachable!("Unexpected first message")
+            }
+        };
+
+        let lock = &mut *app_state.write_lock().expect("---Failed to get write lock");
+
+        for _ in 0..frames_count {
+            lock.state.next();
+        }
 
         lock
             .package_sender
@@ -36,35 +40,34 @@ fn handle_connection(
             }))
             .expect("---Failed to send app package");
 
-        // todo: it's hardcode, provide choice to the user to change rooms
-        AppState::set_selected_room(&mut lock, Some(addr));
-
-        let mut conn_metadata = MetaData {
-            ping: 0,
-            ping_started_at: None,
-            topology_rad: 0_f32,
-            knows_about: vec![],
-        };
+        let mut conn_metadata = MetaData::new();
 
         {
-            let another_conn = lock.streams.iter().find(|(k, _)| !k.eq(&&addr));
+            let package_sender = &lock.package_sender;
+            let state = &mut lock.state;
+            let streams = &mut lock.streams;
+
+            let another_conn = streams.iter().find(|(k, _)| !k.eq(&&addr));
 
             if let Some((targ_addr, (_, targ_metadata))) = another_conn {
-                lock
-                    .package_sender
+                package_sender
                     .send(AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::DEBUG,
                         msg: format!("Sending info about another node {}", targ_addr),
                     }))
                     .expect("---Failed to send app package");
 
-                ProtocolMessage::NodeInfo(
-                    NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
+                conn_metadata.knows_about.push(targ_addr.clone());
+
+                AppState::send_message(
+                    state,
+                    &mut stream,
+                    ProtocolMessage::NodeStatus(
+                        NodeInfo::new(targ_addr.clone(), targ_metadata.ping)
+                    ),
                 )
-                    .send_to_stream(&mut stream)
                     .expect("---Failed to send protocol message");
 
-                conn_metadata.knows_about.push(targ_addr.clone());
             }
         }
 

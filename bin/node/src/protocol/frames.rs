@@ -1,6 +1,6 @@
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use crate::protocol::node_info::NodeInfo;
 use crate::utils::socket_addr_to_bytes::{socket_addr_from_bytes, socket_addr_to_bytes};
 
@@ -25,26 +25,15 @@ pub enum ProtocolMessage {
     ConnClosed,
     Ping,
     Pong(Option<NodeInfo>),
-    Data(Vec<u8>),
-    NodeInfo(NodeInfo),
+    Data(u64, Vec<u8>),
+    NodeStatus(NodeInfo)
 }
 
 impl ProtocolMessage {
     pub const FRAME_SIZE: usize = 256;
     const PAYLOAD_SIZE: usize = Self::FRAME_SIZE - 1;
 
-    pub fn send_to_stream(
-        self,
-        stream: &mut TcpStream,
-    ) -> Result<()> {
-        for chunk in self.into_frames()? {
-            stream.write(&chunk).map_err(|e| anyhow!("---Failed to write to stream: {}", e.to_string()))?;
-        }
-
-        Ok(())
-    }
-
-    fn into_frames(self) -> Result<Vec<Vec<u8>>> {
+    pub fn into_frames(self) -> Result<Vec<Vec<u8>>> {
         let mut buf = vec![];
 
         let opcode = match self {
@@ -61,23 +50,21 @@ impl ProtocolMessage {
                 PROT_OPCODE_PING
             }
             ProtocolMessage::Pong(node_info) => {
-                match node_info {
-                    Some(node_info) => {
-                        buf.extend(
-                            node_info.into_bytes()?
-                        );
-                    }
-                    None => {}
+                if let Some(node_info) = node_info {
+                    buf.extend(
+                        node_info.into_bytes()?
+                    );
                 }
                 PROT_OPCODE_PONG
             }
-            ProtocolMessage::NodeInfo(node_info) => {
+            ProtocolMessage::NodeStatus(node_info) => {
                 buf.extend(
                     node_info.into_bytes()?
                 );
                 PROT_OPCODE_NODE_INFO
             }
-            ProtocolMessage::Data(bytes) => {
+            ProtocolMessage::Data(id, bytes) => {
+                buf.extend(id.to_be_bytes());
                 buf.extend(bytes);
                 PROT_OPCODE_DATA
             }
@@ -122,13 +109,16 @@ impl ProtocolMessage {
 
     pub fn from_stream(
         stream: &mut TcpStream,
-    ) -> Result<Option<Self>> {
+    ) -> Result<Option<(Self, usize)>> {
         let mut buf = Vec::new();
         let mut buf_type = ProtocolBufferType::Data;
 
         let mut frame = [0; Self::FRAME_SIZE];
 
+        let mut frames_count = 0;
         loop {
+            frames_count += 1;
+
             let n = stream.read(&mut frame)?;
             if n == 0 {
                 return Ok(None); // stream has ended = host disconnected
@@ -154,7 +144,7 @@ impl ProtocolMessage {
                             .expect("---Failed to parse buffer")
                             .expect("---Address is required for this opcode");
                         let msg = Self::ConnInit { server_addr };
-                        return Ok(Some(msg));
+                        return Ok(Some((msg, frames_count)));
                     } else {
                         buf_type = ProtocolBufferType::ConnInit;
                     }
@@ -171,19 +161,28 @@ impl ProtocolMessage {
                                     .expect("---Address is required for this opcode");
                                 Self::ConnInit { server_addr }
                             }
-                            ProtocolBufferType::Data => Self::Data(buf),
-                            ProtocolBufferType::NodeInfo => Self::NodeInfo(NodeInfo::from_bytes(buf)?.expect("opcode has to provide at least one")),
+                            ProtocolBufferType::Data => {
+                                let (id, data) = buf.split_at(8);
+                                let id = u64::from_be_bytes(id.try_into().expect("invalid buf length"));
+                                Self::Data(id, data.to_vec())
+                            },
+                            ProtocolBufferType::NodeInfo => {
+                                let another_node = NodeInfo::from_bytes(buf)?.expect("opcode requires NodeINfo");
+                                Self::NodeStatus(another_node)
+                            },
                             ProtocolBufferType::Pong => Self::Pong(NodeInfo::from_bytes(buf)?),
                         };
-                        return Ok(Some(msg));
+                        return Ok(Some((msg, frames_count)));
                     }
                 }
                 PROT_OPCODE_DATA => {
                     buf.extend_from_slice(frame);
 
                     if fin == 1 {
-                        let msg = Self::Data(buf);
-                        return Ok(Some(msg));
+                        let (id, data) = buf.split_at(8);
+                        let id = u64::from_be_bytes(id.try_into().expect("invalid buf length"));
+                        let msg = Self::Data(id, data.to_vec());
+                        return Ok(Some((msg, frames_count)));
                     } else {
                         buf_type = ProtocolBufferType::Data;
                     }
@@ -192,8 +191,9 @@ impl ProtocolMessage {
                     buf.extend_from_slice(frame);
 
                     if fin == 1 {
-                        let msg = Self::NodeInfo(NodeInfo::from_bytes(buf)?.expect("opcode has to provide at least one"));
-                        return Ok(Some(msg));
+                        let another_node = NodeInfo::from_bytes(buf)?.expect("opcode requires NodeINfo");
+                        let msg = Self::NodeStatus(another_node);
+                        return Ok(Some((msg, frames_count)));
                     } else {
                         buf_type = ProtocolBufferType::NodeInfo;
                     }
@@ -203,7 +203,7 @@ impl ProtocolMessage {
 
                     if fin == 1 {
                         let msg = Self::Pong(NodeInfo::from_bytes(buf)?);
-                        return Ok(Some(msg));
+                        return Ok(Some((msg, frames_count)));
                     } else {
                         buf_type = ProtocolBufferType::Pong;
                     }
@@ -214,7 +214,7 @@ impl ProtocolMessage {
                     }
 
                     let msg = Self::ConnClosed;
-                    return Ok(Some(msg));
+                    return Ok(Some((msg, frames_count)));
                 },
                 PROT_OPCODE_PING => {
                     if fin == 0 {
@@ -222,7 +222,7 @@ impl ProtocolMessage {
                     }
 
                     let msg = Self::Ping;
-                    return Ok(Some(msg));
+                    return Ok(Some((msg, frames_count)));
                 },
                 _ => {
                     bail!("Unknown opcode")

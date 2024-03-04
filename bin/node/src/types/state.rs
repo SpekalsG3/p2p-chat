@@ -1,11 +1,14 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::mpsc::Sender;
 use std::time::SystemTime;
 use anyhow::{anyhow, Result};
 use crate::commands::NodeCommand;
+use crate::protocol::frames::ProtocolMessage;
 use crate::types::package::AppPackage;
+use crate::utils::prng::{Splitmix64, Xoshiro256ss};
 
 #[derive(Debug)]
 pub struct MetaData {
@@ -17,13 +20,25 @@ pub struct MetaData {
     pub(crate) knows_about: Vec<SocketAddr>,
 }
 
+impl MetaData {
+    pub fn new() -> Self {
+        Self {
+            ping: 0,
+            ping_started_at: None,
+            topology_rad: 0_f32,
+            knows_about: vec![],
+        }
+    }
+}
+
 pub(crate) struct AppStateInnerRef {}
 pub(crate) struct AppStateInnerMut {
     pub(crate) server_addr: SocketAddr,
     pub(crate) command_sender: Sender<NodeCommand>,
     pub(crate) package_sender: Sender<AppPackage>,
     pub(crate) streams: HashMap<SocketAddr, (TcpStream, MetaData)>,
-    selected_room: Option<SocketAddr>,
+    pub(crate) state: Xoshiro256ss,
+    pub(crate) data_id_states: HashMap<u64, ()>,
 }
 pub(crate) struct AppStateInner {
     _r: AppStateInnerRef,
@@ -37,6 +52,7 @@ impl AppState {
         server_addr: SocketAddr,
         command_sender: Sender<NodeCommand>,
         package_sender: Sender<AppPackage>,
+        seed: u64,
     ) -> Self {
         Self(Arc::new(AppStateInner {
             _r: AppStateInnerRef {
@@ -46,7 +62,8 @@ impl AppState {
                 command_sender,
                 package_sender,
                 streams: HashMap::new(),
-                selected_room: None,
+                state: Splitmix64::new(seed).xorshift256ss(),
+                data_id_states: HashMap::new(),
             }),
         }))
     }
@@ -59,17 +76,17 @@ impl AppState {
         self.0.m.write().map_err(|e| anyhow!(e.to_string()))
     }
 
-    pub fn get_selected_room(
-        lock: &RwLockReadGuard<'_, AppStateInnerMut>,
-    ) -> Option<SocketAddr> {
-        lock.selected_room
-    }
+    pub fn send_message(
+        state: &mut Xoshiro256ss,
+        stream: &mut TcpStream,
+        message: ProtocolMessage,
+    ) -> Result<()> {
+        for chunk in message.into_frames()? {
+            state.next();
+            stream.write(&chunk).map_err(|e| anyhow!("---Failed to write to stream: {}", e.to_string()))?;
+        }
 
-    pub fn set_selected_room(
-        lock: &mut RwLockWriteGuard<'_, AppStateInnerMut>,
-        room: Option<SocketAddr>,
-    ) {
-        lock.selected_room = room;
+        Ok(())
     }
 }
 

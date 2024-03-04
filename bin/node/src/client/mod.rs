@@ -19,10 +19,14 @@ pub fn start_client(
     {
         let mut lock = app_state.write_lock().expect("---Failed to get write lock");
 
-        ProtocolMessage::ConnInit {
-            server_addr: lock.server_addr
-        }
-            .send_to_stream(&mut stream)
+        let server_addr = lock.server_addr;
+        AppState::send_message(
+            &mut lock.state,
+            &mut stream,
+            ProtocolMessage::ConnInit {
+                server_addr,
+            },
+        )
             .expect("---Failed to write to stream");
 
         lock
@@ -56,23 +60,13 @@ pub fn start_client(
             }))
             .expect("---Failed to send app package");
 
-        let mut targ_metadata = MetaData {
-            ping,
-            ping_started_at: None,
-            topology_rad: 0_f32,
-            knows_about: vec![],
-        };
-        let ping = targ_metadata.ping;
+        let mut targ_metadata = MetaData::new();
+        targ_metadata.ping = ping;
 
-        // todo: it's hardcode, provide choice to the user to change rooms
-        AppState::set_selected_room(&mut lock, Some(addr));
+        if let Some((src_addr, src_to_targ_ping)) = src_info {
+            let src_ping = lock.streams.get_mut(&src_addr).expect("src_addr should exist").1.ping;
 
-        if let Some((src_addr, src_ping)) = src_info {
-            let a = src_ping;
-            let b = ping;
-            let c = lock.streams.get_mut(&src_addr).expect("src_addr should exist").1.ping;
-
-            let angle = sss_triangle(c, b, a);
+            let angle = sss_triangle(src_ping, ping, src_to_targ_ping);
 
             lock
                 .package_sender

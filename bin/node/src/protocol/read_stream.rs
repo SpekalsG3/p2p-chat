@@ -20,27 +20,51 @@ pub fn protocol_read_stream(
             // stream has ended = host disconnected
             break;
         }
-        let message = message.unwrap();
+        let (message, frames_count) = message.unwrap();
+
+        let lock = &mut *app_state.write_lock().expect("---Failed to get write lock");
+
+        let streams = &mut lock.streams;
+        let state = &mut lock.state;
+        let data_id_states = &mut lock.data_id_states;
+
+        for _ in 0..frames_count {
+            state.next();
+        }
 
         match message {
             ProtocolMessage::ConnInit { .. } => {
                 unreachable!("Unexpected protocol message")
             }
             ProtocolMessage::ConnClosed => {
-                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
-
-                let (ref mut stream, _) = lock
-                    .streams
+                let (ref mut stream, _) = streams
                     .get_mut(&addr)
                     .expect("Unknown address");
 
                 stream.shutdown(Shutdown::Both).expect("Failed to shutdown");
-                lock.streams.remove(&addr);
+                streams.remove(&addr);
 
                 break;
             }
-            ProtocolMessage::Data(data) => {
-                let lock = app_state.read_lock().expect("---Failed to get write lock");
+            ProtocolMessage::Data(id, data) => {
+                if data_id_states.contains_key(&id) {
+                    continue;
+                }
+                data_id_states.insert(id, ());
+
+                for (targ_addr, (ref mut stream, _)) in streams.iter_mut() {
+                    if targ_addr == &addr {
+                        continue
+                    }
+
+                    AppState::send_message(
+                        state,
+                        stream,
+                        ProtocolMessage::Data(id, data.clone()),
+                    )
+                        .expect("Failed to write to stream");
+                }
+
                 lock
                     .package_sender
                     .send(AppPackage::Message(MessagePackage {
@@ -49,9 +73,7 @@ pub fn protocol_read_stream(
                     }))
                     .expect("---Failed to send app package");
             }
-            ProtocolMessage::NodeInfo(info) => {
-                let lock = app_state.read_lock().expect("---Failed to get write lock");
-
+            ProtocolMessage::NodeStatus(info) => {
                 if lock.streams.contains_key(&info.addr) {
                     continue;
                 }
@@ -77,8 +99,6 @@ pub fn protocol_read_stream(
                 }
             }
             ProtocolMessage::Pong(info) => {
-                let mut lock = app_state.write_lock().expect("---Failed to get write lock");
-
                 let ping_info = if let Some(info) = info {
                     let src_ping = lock.streams.get(&info.addr).expect("src_addr should exist").1.ping;
                     Some((src_ping, info.ping))
@@ -134,7 +154,6 @@ pub fn protocol_read_stream(
                     .expect("---Failed to send app package");
             }
             ProtocolMessage::Ping => {
-                let lock = app_state.read_lock().expect("---Failed to get write lock");
                 let (_, metadata) = lock.streams.get(&addr).expect("entry should exist");
 
                 let info = {
@@ -160,8 +179,11 @@ pub fn protocol_read_stream(
                     }))
                     .expect("---Failed to send app package");
 
-                ProtocolMessage::Pong(info)
-                    .send_to_stream(&mut stream)
+                AppState::send_message(
+                    &mut lock.state,
+                    &mut stream,
+                    ProtocolMessage::Pong(info),
+                )
                     .expect("Failed to send protocol to stream");
             }
         }

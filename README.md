@@ -1,7 +1,12 @@
 # Private Chat
 
-This is a p2p chat with asymmetric encryption built in pure rust using
-only convenience libraries.
+NOTE: This is no way production-ready code. It is created for research purposes and
+currently stays like that.
+
+---
+
+This is a P2P chat with its own simple protocol ~~and Diffie-Hellman+RSA encryption~~
+built with std Rust using only convenience libraries.
 
 # Limitations to pure xterm interface
 - If changing cursor horizontally `V100::GoLineUp`/`Down`/`InsertBlankLines`/`MoveWindowUp`,
@@ -15,10 +20,30 @@ via enter then at best can introduce an empty line
 
 # Protocol
 
+Current protocol is a Peer-to-Peer protocol with self-managing topology,
+which means nodes reorganize themselves in the network in the best way
+possible without any external influence.
+
+Currently, protocol ignores all security concerns and any network packet loss,
+as it's not the main interest of development.
+For now, two assumptions are made:
+- Each node can fully trust another node
+- TCP connection is reliable
+
+## Pseudo-Random Number Generator
+
+P2P nature of a protocol requires to use message ids in order to ignore messages received previously.
+It was decided that random id suits best. [xoroshiro128**](https://prng.di.unimi.it/xoroshiro128starstar.c) used to generate these numbers.
+
+In theory, we can use small-scale-bit generators to optimize space usage for two reasons:
+- We can reset the state after some time. (Not sure how it helps though xd)
+- We have only a specific small number of nodes, we are connected to, we are worried about
+not to collide with.
+
 ## Framing
 
 Inspired by [WebSockets RFC](https://datatracker.ietf.org/doc/html/rfc6455#section-5.3)
-and simplified for my use case.
+and simplified
 
 - 1 bit - FIN flag - is this the last package
 - 3 bit - Reserved - just a padding to skip this byte 
@@ -72,3 +97,28 @@ After connecting, application sends `DATA`
 - [ ] Measuring the ping accurately in step 1. TCP is a three-way handshake.
 `CONN_INIT` is one way. `PING` is initiated on the server.
 `ACK` shouldn't be there. What else?
+
+---
+
+# Notes
+
+## Message id brainstorm
+
+Two u32 ids solution:
+- `data_read_id` cannot be node-dependant because each node is likely to be connected
+to at least the same two nodes. Which means, these two nodes will then
+duplicate this message during the broadcast.
+- `data_read_id` cannot be state dependant because if 2 nodes send message
+nearly in the same, ids will collide and another node in between will receive only one of them.
+- If `data_read_id` is state dependant, it will cause us to miss 1 or 2 first messages
+because of the latencies caused by syncing it from different nodes.
+- One `u32` can handle 4B messages, so it can be used for really long time.
+- Two ids solution seem to be prone to latency issues from the same node. In practice, it should be extremely unlikely case
+because node locks state until the whole frame is written to stream, which means
+next message will be always written later and thus take longer time.
+
+Random ids solution:
+- Should store multiple u32 ids which is a lot less predictable in case of a spam.
+However, any node needs to store an id about the message no longer then greatest ping of connected nodes.
+This is because the nodes we are connected to will always receive the message from use.
+- Random ids are prone to collisions between different nodes
