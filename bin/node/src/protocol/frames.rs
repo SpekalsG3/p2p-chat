@@ -26,9 +26,6 @@ pub enum ProtocolMessage {
     Ping,
     Pong(Option<NodeInfo>),
     Data(Vec<u8>),
-    // todo: i cannot fucking use the same addresses to tell others to connect to
-    //  they are local sockets, not remote
-    //  on connect, server have to receive ip:port where a client will receive connects to
     NodeInfo(NodeInfo),
 }
 
