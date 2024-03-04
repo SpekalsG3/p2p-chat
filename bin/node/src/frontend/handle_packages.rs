@@ -15,6 +15,7 @@ pub fn handle_packages(
                 ui.new_message(&format!("User: {}", message.from), &msg);
             }
             AppPackage::Alert(alert) => {
+                // todo: prevent display of DEBUG level when ran in development mode
                 ui.new_message(&format!("System: {}", alert.level), &alert.msg);
             }
         }
