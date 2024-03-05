@@ -10,8 +10,6 @@ pub fn start_pinging(
     app_state: ProtocolState,
     addr: SocketAddr,
 ) {
-    std::thread::sleep(Duration::from_secs(1)); // todo: remove, used only for debug
-
     loop {
         {
             let lock = &mut *app_state.lock().expect("---Failed to acquire write lock");
