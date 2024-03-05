@@ -6,7 +6,7 @@ use crate::utils::ui::UITerminal;
 pub struct AppStateInner {
     // don't like that this fields are public
     pub protocol_state: ProtocolState, // this is accessed only to be passed to protocol functions
-    pub ui: UITerminal, // this is accessed only by frontend 
+    pub ui: UITerminal, // this is accessed only by frontend
 }
 
 impl AppStateInner {
@@ -17,7 +17,7 @@ impl AppStateInner {
                 self.ui.new_message(&format!("User: {}", message.from), &msg);
             }
             AppPackage::Alert(alert) => {
-                // todo: prevent display of DEBUG level when ran in development mode
+                // todo: write macro to wrap sending packages and ignore `level: DEBUG` in release mode
                 self.ui.new_message(&format!("System: {}", alert.level), &alert.msg);
             }
         }
