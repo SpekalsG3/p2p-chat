@@ -1,13 +1,10 @@
 use std::io::{stdout, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use crate::types::ui::V100;
 
-struct UITerminalInner {
+pub struct UITerminal {
     last_index: AtomicUsize,
 }
-
-pub struct UITerminal(Arc<UITerminalInner>);
 
 impl UITerminal {
     pub fn new() -> Self {
@@ -17,9 +14,9 @@ impl UITerminal {
             V100::GoLineUp(1),
         );
         stdout().flush().expect("failed to flash stdout");
-        Self(Arc::new(UITerminalInner {
+        Self {
             last_index: AtomicUsize::new(0),
-        }))
+        }
     }
 
     pub fn new_message(
@@ -27,7 +24,7 @@ impl UITerminal {
         from: &str,
         msg: &str,
     ) -> usize {
-        let index = self.0.last_index
+        let index = self.last_index
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| {
                 Some(if id == usize::MAX {
                     0
@@ -50,11 +47,5 @@ impl UITerminal {
         stdout().flush().expect("failed to flash stdout");
 
         index
-    }
-}
-
-impl Clone for UITerminal {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
     }
 }

@@ -1,25 +1,14 @@
 use std::sync::mpsc::Receiver;
+use crate::frontend::state::AppState;
 use crate::types::package::{AlertPackageLevel, AppPackage};
-use crate::types::state::AppState;
-use crate::utils::ui::UITerminal;
 
 pub fn handle_packages(
-    _app_state: AppState,
-    ui: UITerminal,
-    rx: Receiver<AppPackage>,
+    app_state: AppState,
+    package_receiver: Receiver<AppPackage>,
 ) {
-    while let Ok(package) = rx.recv() {
-        match package {
-            AppPackage::Message(message) => {
-                let msg = String::from_utf8_lossy(&message.msg).to_string();
-                ui.new_message(&format!("User: {}", message.from), &msg);
-            }
-            AppPackage::Alert(alert) => {
-                // todo: prevent display of DEBUG level when ran in development mode
-                ui.new_message(&format!("System: {}", alert.level), &alert.msg);
-            }
-        }
+    while let Ok(package) = package_receiver.recv() {
+        app_state.new_package(package);
     }
 
-    ui.new_message(&format!("System: {}", AlertPackageLevel::INFO), "channel hangup");
+    app_state.ui.new_message(&format!("System: {}", AlertPackageLevel::INFO), "channel hangup");
 }

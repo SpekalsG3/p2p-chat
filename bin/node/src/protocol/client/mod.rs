@@ -3,12 +3,12 @@ use std::thread::JoinHandle;
 use std::time::SystemTime;
 use crate::protocol::frames::ProtocolMessage;
 use crate::protocol::read_stream::protocol_read_stream;
+use crate::protocol::state::{ProtocolState, StreamMetadata};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
-use crate::types::state::{AppState, MetaData};
 use crate::utils::sss_triangle::sss_triangle;
 
 pub fn start_client(
-    app_state: AppState,
+    app_state: ProtocolState,
     addr: SocketAddr,
     src_info: Option<(SocketAddr, u16)>,
 ) -> Option<JoinHandle<()>> {
@@ -20,7 +20,7 @@ pub fn start_client(
         let mut lock = app_state.lock().expect("---Failed to get write lock");
 
         let server_addr = lock.server_addr;
-        AppState::send_message(
+        ProtocolState::send_message(
             &mut lock.state,
             &mut stream,
             ProtocolMessage::ConnInit {
@@ -60,7 +60,7 @@ pub fn start_client(
             }))
             .expect("---Failed to send app package");
 
-        let mut targ_metadata = MetaData::new();
+        let mut targ_metadata = StreamMetadata::new();
         targ_metadata.ping = ping;
 
         if let Some((src_addr, src_to_targ_ping)) = src_info {

@@ -1,21 +1,21 @@
 mod frontend;
 mod protocol;
-mod server;
 mod types;
 mod utils;
-mod client;
 mod commands;
 
 use std::env::args;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
-use crate::client::start_client;
 use crate::commands::command_processor;
 use crate::frontend::setup_frontend;
-use crate::server::handle_connection::start_server;
+use crate::frontend::state::{AppState, AppStateInner};
+use crate::protocol::client::start_client;
+use crate::protocol::server::handle_connection::start_server;
+use crate::protocol::state::ProtocolState;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
-use crate::types::state::AppState;
+use crate::utils::ui::UITerminal;
 
 fn main() {
     let (server_addr, client_addr) = {
@@ -50,45 +50,47 @@ fn main() {
     let (package_sender, package_receiver) = channel();
     let (command_sender, command_receiver) = channel();
 
-    let seed = 1234567; // todo: get seed randomly
-    let app_state = AppState::new(
-        server_addr,
-        command_sender,
-        package_sender,
-        seed,
-    );
+    let app_state = {
+        let seed = 1234567; // todo: get seed randomly
+        let protocol_state = ProtocolState::new(
+            server_addr,
+            command_sender,
+            package_sender,
+            seed,
+        );
+        AppState::new(AppStateInner {
+            protocol_state,
+            ui: UITerminal::new(),
+        })
+    };
     let mut handles = vec![];
 
-    {
-        let lock = app_state.lock().expect("Failed to get write lock");
-        lock
-            .package_sender
-            .send(AppPackage::Alert(AlertPackage {
-                level: AlertPackageLevel::INFO,
-                msg: "Init threads".to_string(),
-            }))
-            .expect("---Failed to send app package");
-    }
-
+    app_state.new_package(AppPackage::Alert(AlertPackage {
+        level: AlertPackageLevel::INFO,
+        msg: "Init threads".to_string(),
+    }));
 
     {
-        let app_state = app_state.clone();
-        if let Some(handle) = start_server(app_state, server_addr) {
+        let protocol_state = app_state.protocol_state.clone();
+        if let Some(handle) = start_server(protocol_state, server_addr) {
             handles.push(handle);
         }
     }
+
+    // this will be removed with ui commands like `/connect`
     if let Some(client_addr) = client_addr {
-        let app_state = app_state.clone();
-        let handle = start_client(app_state, client_addr, None);
+        let protocol_state = app_state.protocol_state.clone();
+        let handle = start_client(protocol_state, client_addr, None);
         handles.extend(handle);
     }
-    handles.extend(setup_frontend(
-        app_state.clone(),
-        package_receiver,
-    ));
+
     handles.extend(command_processor(
         app_state.clone(),
-        command_receiver,
+        command_receiver, // this is a bridge from application to protocol
+    ));
+    handles.extend(setup_frontend(
+        app_state.clone(),
+        package_receiver, // this is a bridge from protocol to application
     ));
 
     for handle in handles {

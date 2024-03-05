@@ -1,14 +1,16 @@
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::{Duration, SystemTime};
-use crate::commands::NodeCommand;
-use crate::protocol::frames::ProtocolMessage;
-use crate::protocol::node_info::NodeInfo;
+use crate::commands::ProtocolCommand;
+use crate::protocol::{
+    frames::ProtocolMessage,
+    node_info::NodeInfo,
+    state::ProtocolState,
+};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
-use crate::types::state::AppState;
 use crate::utils::sss_triangle::sss_triangle;
 
 pub fn protocol_read_stream(
-    app_state: AppState,
+    app_state: ProtocolState,
     addr: SocketAddr,
     mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
 ) {
@@ -61,7 +63,7 @@ pub fn protocol_read_stream(
                         biggest_ping = metadata.ping;
                     }
 
-                    AppState::send_message(
+                    ProtocolState::send_message(
                         state,
                         stream,
                         ProtocolMessage::Data(id, data.clone()),
@@ -107,7 +109,7 @@ pub fn protocol_read_stream(
 
                     lock
                         .command_sender
-                        .send(NodeCommand::ClientConnect {
+                        .send(ProtocolCommand::ClientConnect {
                             targ_addr: info.addr,
                             src_to_targ_ping: info.ping,
                             src_addr: addr,
@@ -198,7 +200,7 @@ pub fn protocol_read_stream(
                     }))
                     .expect("---Failed to send app package");
 
-                AppState::send_message(
+                ProtocolState::send_message(
                     &mut lock.state,
                     &mut stream,
                     ProtocolMessage::Pong(info),

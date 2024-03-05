@@ -4,11 +4,11 @@ use crate::protocol::frames::ProtocolMessage;
 use crate::protocol::node_info::NodeInfo;
 use crate::protocol::start_pinging::start_pinging;
 use crate::protocol::read_stream::protocol_read_stream;
+use crate::protocol::state::{ProtocolState, StreamMetadata};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
-use crate::types::state::{AppState, MetaData};
 
 fn handle_connection(
-    app_state: AppState,
+    app_state: ProtocolState,
     mut stream: TcpStream,
 ) {
     let addr;
@@ -40,7 +40,7 @@ fn handle_connection(
             }))
             .expect("---Failed to send app package");
 
-        let mut conn_metadata = MetaData::new();
+        let mut conn_metadata = StreamMetadata::new();
 
         {
             let package_sender = &lock.package_sender;
@@ -60,7 +60,7 @@ fn handle_connection(
                 conn_metadata.knows_about.push(targ_addr.clone());
 
                 // todo: check angles and pings to find the closest node to the client
-                AppState::send_message(
+                ProtocolState::send_message(
                     state,
                     &mut stream,
                     ProtocolMessage::NodeStatus(
@@ -95,7 +95,7 @@ fn handle_connection(
 }
 
 fn running_server(
-    app_state: AppState,
+    app_state: ProtocolState,
     server: TcpListener,
 ) {
     let mut handles = vec![];
@@ -129,7 +129,7 @@ fn running_server(
 }
 
 pub fn start_server(
-    app_state: AppState,
+    app_state: ProtocolState,
     server_addr: SocketAddr,
 ) -> Option<JoinHandle<()>> {
     let server = {

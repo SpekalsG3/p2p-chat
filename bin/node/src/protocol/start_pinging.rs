@@ -1,13 +1,13 @@
 use std::net::{Shutdown, SocketAddr};
 use std::time::{Duration, SystemTime};
 use crate::protocol::frames::ProtocolMessage;
+use crate::protocol::state::ProtocolState;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
-use crate::types::state::AppState;
 
 const PING_INTERVAL: u64 = 2 * 60; // 2 minutes
 
 pub fn start_pinging(
-    app_state: AppState,
+    app_state: ProtocolState,
     addr: SocketAddr,
 ) {
     std::thread::sleep(Duration::from_secs(1)); // todo: remove, used only for debug
@@ -34,7 +34,7 @@ pub fn start_pinging(
             }
 
             metadata.ping_started_at = Some(now);
-            AppState::send_message(
+            ProtocolState::send_message(
                 state,
                 stream,
                 ProtocolMessage::Ping

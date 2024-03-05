@@ -1,12 +1,9 @@
 use std::io::{stdout, Write};
-use crate::protocol::frames::ProtocolMessage;
-use crate::types::state::AppState;
+use crate::frontend::state::AppState;
 use crate::types::ui::V100;
-use crate::utils::ui::UITerminal;
 
 pub fn send_message(
     app_state: AppState,
-    ui: UITerminal,
     message: &str,
 ) {
     let index = {
@@ -18,7 +15,7 @@ pub fn send_message(
             ).as_bytes())
             .expect("Failed to write");
 
-        let index = ui.new_message("YOU", message);
+        let index = app_state.ui.new_message("YOU", message);
 
         stdout
             .write(format!(
@@ -33,20 +30,8 @@ pub fn send_message(
         index
     };
 
-    // todo: create some wrapper so that Application does not have to know about Protocol stuff.
-    let lock = &mut *app_state.lock().expect("---Failed to acquire write lock");
-    let streams = &mut lock.streams;
-    let state = &mut lock.state;
-
-    let id = state.next();
-    let data = message.as_bytes().to_vec();
-
-    for (_, (ref mut stream, _)) in streams.iter_mut() {
-        AppState::send_message(
-            state,
-            stream,
-            ProtocolMessage::Data(id, data.clone()),
-        )
-            .expect(&format!("Failed to send message #{}", index));
-    }
+    app_state
+        .protocol_state
+        .broadcast_data(message.as_bytes().to_vec())
+        .expect(&format!("Failed to broadcast message #{}", index));
 }
