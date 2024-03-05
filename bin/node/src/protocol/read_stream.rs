@@ -180,7 +180,7 @@ pub fn protocol_read_stream(
                         let (_, metadata) = lock
                             .streams
                             .get(&targ_addr)
-                            .expect("we should know about it bc `targ_addr` knows about us bc we connected to him");
+                            .expect("we should know about it bc `targ_addr` knows about us bc we connected to it");
 
                         Some(
                             NodeInfo::new(targ_addr.clone(), metadata.ping)

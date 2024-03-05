@@ -59,6 +59,7 @@ fn handle_connection(
 
                 conn_metadata.knows_about.push(targ_addr.clone());
 
+                // todo: check angles and pings to find the closest node to the client
                 AppState::send_message(
                     state,
                     &mut stream,
