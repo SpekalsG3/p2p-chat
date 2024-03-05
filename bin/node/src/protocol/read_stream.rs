@@ -95,10 +95,10 @@ pub fn protocol_read_stream(
                     .expect("---Failed to send app package");
             }
             ProtocolMessage::NodeStatus(info) => {
-                if lock.streams.contains_key(&info.addr) {
+                if streams.contains_key(&info.addr) {
                     continue;
                 }
-                if lock.streams.len() < 4 { // todo: move as config variable
+                if streams.len() < 4 { // todo: move as config variable
                     lock
                         .package_sender
                         .send(AppPackage::Alert(AlertPackage {
@@ -116,7 +116,37 @@ pub fn protocol_read_stream(
                         })
                         .expect("---Failed to send NodeCommand");
                 } else {
-                    // todo: if ping is lower then biggest latency we have, then disconnect and connect to that one
+                    let mut biggest_ping = 0;
+                    let mut worst_node = None;
+                    for (addr, (stream, metadata)) in streams.iter() {
+                        if metadata.ping > biggest_ping {
+                            biggest_ping = metadata.ping;
+                            worst_node = Some((addr, stream));
+                        }
+                    }
+
+                    if let Some((r_addr, stream)) = worst_node {
+                        lock
+                            .package_sender
+                            .send(AppPackage::Alert(AlertPackage {
+                                level: AlertPackageLevel::DEBUG,
+                                msg: format!("Changing nodes from {} to {}", r_addr, info.addr),
+                            }))
+                            .expect("---Failed to send app package");
+
+                        // first connect in case there's unhandled problem, then disconnect
+                        lock
+                            .command_sender
+                            .send(ProtocolCommand::ClientConnect {
+                                targ_addr: info.addr,
+                                src_to_targ_ping: info.ping,
+                                src_addr: addr,
+                            })
+                            .expect("---Failed to send NodeCommand");
+
+                        stream.shutdown(Shutdown::Both).expect("Failed to shutdown");
+                        streams.remove(&r_addr.clone()); // clone is workaround for mutable with immutable references
+                    }
                 }
             }
             ProtocolMessage::Pong(info) => {
