@@ -60,6 +60,8 @@ fn handle_connection(
                 conn_metadata.knows_about.push(targ_addr.clone());
 
                 // todo: check angles and pings to find the closest node to the client
+                //  idk the ping to this new connection nor who hes connected to
+                //  i can think only of one thing - do the ping-pong first
                 ProtocolState::send_message(
                     state,
                     &mut stream,
@@ -68,7 +70,6 @@ fn handle_connection(
                     ),
                 )
                     .expect("---Failed to send protocol message");
-
             }
         }
 
