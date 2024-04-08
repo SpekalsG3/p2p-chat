@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::Sender;
 use std::time::SystemTime;
 use anyhow::{anyhow, Context, Result};
 use crate::core::{
@@ -13,7 +13,7 @@ use crate::types::package::AppPackage;
 use crate::utils::prng::{Splitmix64, Xoshiro256ss};
 
 #[derive(Debug)]
-pub struct StreamMetadata {
+pub(crate) struct StreamMetadata {
     pub ping: u16, // in milliseconds but we check that ping is less then 60000 so it can fit
     pub ping_started_at: Option<SystemTime>,
     pub topology_rad: f32, // angel relative to the first connection, used to determine who's closer to another user
@@ -33,15 +33,18 @@ impl StreamMetadata {
     }
 }
 
-pub struct ProtocolStateInnerMut {
+pub struct ProtocolStateInnerRead {
     pub server_addr: SocketAddr,
-    pub command_sender: Sender<ProtocolCommand>,
     pub package_sender: Sender<AppPackage>,
+}
+pub(crate) struct ProtocolStateInnerMut {
+    pub command_sender: Sender<ProtocolCommand>,
     pub streams: HashMap<SocketAddr, (TcpStream, StreamMetadata)>,
     pub state: Xoshiro256ss,
     pub data_id_states: HashMap<u64, ()>,
 }
 pub struct ProtocolStateInner {
+    r: ProtocolStateInnerRead,
     m: Mutex<ProtocolStateInnerMut>,
 }
 
@@ -55,10 +58,12 @@ impl ProtocolState {
         seed: u64,
     ) -> Self {
         Self(Arc::new(ProtocolStateInner {
-            m: Mutex::new(ProtocolStateInnerMut {
+            r: ProtocolStateInnerRead {
                 server_addr,
-                command_sender,
                 package_sender,
+            },
+            m: Mutex::new(ProtocolStateInnerMut {
+                command_sender,
                 streams: HashMap::new(),
                 state: Splitmix64::new(seed).xorshift256ss(),
                 data_id_states: HashMap::new(),
@@ -66,7 +71,11 @@ impl ProtocolState {
         }))
     }
 
-    pub fn lock(&self) -> Result<MutexGuard<ProtocolStateInnerMut>> {
+    pub fn read(&self) -> &ProtocolStateInnerRead {
+        &self.0.r
+    }
+
+    pub(crate) fn lock(&self) -> Result<MutexGuard<ProtocolStateInnerMut>> {
         self.0.m.lock().map_err(|e| anyhow!(e.to_string()))
     }
 

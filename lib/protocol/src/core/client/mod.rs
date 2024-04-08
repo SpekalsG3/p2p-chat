@@ -3,12 +3,14 @@ use std::thread::JoinHandle;
 use std::time::SystemTime;
 use crate::core::frames::ProtocolMessage;
 use crate::core::read_stream::protocol_read_stream;
-use crate::core::state::{ProtocolState, StreamMetadata};
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
+use crate::types::{
+    state::{ProtocolState, StreamMetadata},
+    package::{AlertPackage, AlertPackageLevel, AppPackage}
+};
 use crate::utils::sss_triangle::sss_triangle;
 
 pub fn start_client(
-    app_state: ProtocolState,
+    protocol_state: ProtocolState,
     addr: SocketAddr,
     src_info: Option<(SocketAddr, u16)>,
 ) -> Option<JoinHandle<()>> {
@@ -17,9 +19,9 @@ pub fn start_client(
     let ping = SystemTime::now().duration_since(ping).expect("Failed to calculate ping").as_millis();
 
     {
-        let mut lock = app_state.lock().expect("---Failed to get write lock");
+        let server_addr = protocol_state.read().server_addr;
+        let mut lock = protocol_state.lock().expect("---Failed to get write lock");
 
-        let server_addr = lock.server_addr;
         ProtocolState::send_message(
             &mut lock.state,
             &mut stream,
@@ -29,18 +31,20 @@ pub fn start_client(
         )
             .expect("---Failed to write to stream");
 
-        lock
+        protocol_state
+            .read()
             .package_sender
             .send(AppPackage::Alert(AlertPackage {
                 level: AlertPackageLevel::DEBUG,
-                msg: format!("Sent init message to {} with server_addr {}", addr, lock.server_addr),
+                msg: format!("Sent init message to {} with server_addr {}", addr, server_addr),
             }))
             .expect("---Failed to send app package");
 
         // u16 < 2^24 => save to convert to f32
         // src - https://stackoverflow.com/a/41651053
         if ping > 60_000 { // todo: move to constant
-            lock
+            protocol_state
+                .read()
                 .package_sender
                 .send(AppPackage::Alert(AlertPackage {
                     level: AlertPackageLevel::WARNING,
@@ -52,7 +56,8 @@ pub fn start_client(
         }
         let ping = ping as u16;
 
-        lock
+        protocol_state
+            .read()
             .package_sender
             .send(AppPackage::Alert(AlertPackage {
                 level: AlertPackageLevel::INFO,
@@ -68,7 +73,8 @@ pub fn start_client(
 
             let angle = sss_triangle(src_ping, ping, src_to_targ_ping);
 
-            lock
+            protocol_state
+                .read()
                 .package_sender
                 .send(AppPackage::Alert(AlertPackage {
                     level: AlertPackageLevel::DEBUG,
@@ -85,7 +91,8 @@ pub fn start_client(
             targ_metadata,
         ));
 
-        lock
+        protocol_state
+            .read()
             .package_sender
             .send(AppPackage::Alert(AlertPackage {
                 level: AlertPackageLevel::DEBUG,
@@ -95,7 +102,7 @@ pub fn start_client(
     }
 
     let read_handle = {
-        let app_state = app_state.clone();
+        let app_state = protocol_state.clone();
         std::thread::spawn(move || {
             protocol_read_stream(
                 app_state,

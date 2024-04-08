@@ -1,20 +1,20 @@
 use std::net::{Shutdown, SocketAddr};
 use std::time::{Duration, SystemTime};
-use crate::core::{
-    frames::ProtocolMessage,
+use crate::core::frames::ProtocolMessage;
+use crate::types::{
     state::ProtocolState,
+    package::{AlertPackage, AlertPackageLevel, AppPackage},
 };
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
 const PING_INTERVAL: u64 = 2 * 60; // 2 minutes
 
 pub fn start_pinging(
-    app_state: ProtocolState,
+    protocol_state: ProtocolState,
     addr: SocketAddr,
 ) {
     loop {
         {
-            let lock = &mut *app_state.lock().expect("---Failed to acquire write lock");
+            let lock = &mut *protocol_state.lock().expect("---Failed to acquire write lock");
             let streams = &mut lock.streams;
             let state = &mut lock.state;
 
@@ -41,7 +41,8 @@ pub fn start_pinging(
             )
                 .expect("---Failed send frame");
 
-            lock
+            protocol_state
+                .read()
                 .package_sender
                 .send(AppPackage::Alert(AlertPackage {
                     level: AlertPackageLevel::DEBUG,

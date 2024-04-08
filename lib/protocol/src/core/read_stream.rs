@@ -4,13 +4,15 @@ use crate::core::{
     commands::ProtocolCommand,
     frames::ProtocolMessage,
     node_info::NodeInfo,
-    state::ProtocolState,
 };
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage};
+use crate::types::{
+    state::ProtocolState,
+    package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage},
+};
 use crate::utils::sss_triangle::sss_triangle;
 
 pub fn protocol_read_stream(
-    app_state: ProtocolState,
+    protocol_state: ProtocolState,
     addr: SocketAddr,
     mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
 ) {
@@ -24,7 +26,7 @@ pub fn protocol_read_stream(
         }
         let (message, frames_count) = message.unwrap();
 
-        let lock = &mut *app_state.lock().expect("---Failed to get write lock");
+        let lock = &mut *protocol_state.lock().expect("---Failed to get write lock");
 
         let streams = &mut lock.streams;
         let state = &mut lock.state;
@@ -72,7 +74,7 @@ pub fn protocol_read_stream(
                 }
 
                 {
-                    let app_state = app_state.clone();
+                    let app_state = protocol_state.clone();
                     std::thread::spawn(move || {
                         let ping = if biggest_ping == 0 {
                             1
@@ -86,7 +88,8 @@ pub fn protocol_read_stream(
                     });
                 }
 
-                lock
+                protocol_state
+                    .read()
                     .package_sender
                     .send(AppPackage::Message(MessagePackage {
                         from: addr,
@@ -99,7 +102,8 @@ pub fn protocol_read_stream(
                     continue;
                 }
                 if streams.len() < 4 { // todo: move as config variable
-                    lock
+                    protocol_state
+                        .read()
                         .package_sender
                         .send(AppPackage::Alert(AlertPackage {
                             level: AlertPackageLevel::DEBUG,
@@ -126,7 +130,8 @@ pub fn protocol_read_stream(
                     }
 
                     if let Some((r_addr, stream)) = worst_node {
-                        lock
+                        protocol_state
+                            .read()
                             .package_sender
                             .send(AppPackage::Alert(AlertPackage {
                                 level: AlertPackageLevel::DEBUG,
@@ -168,7 +173,8 @@ pub fn protocol_read_stream(
 
                 let ping = SystemTime::now().duration_since(metadata.ping_started_at.unwrap()).unwrap().as_millis();
                 if ping > 60_000 { // todo: move to constant
-                    lock
+                    protocol_state
+                        .read()
                         .package_sender
                         .send(AppPackage::Alert(AlertPackage {
                             level: AlertPackageLevel::WARNING,
@@ -187,7 +193,8 @@ pub fn protocol_read_stream(
                     let angle = sss_triangle(src_ping, ping, src_to_targ_ping);
                     metadata.topology_rad = angle;
 
-                    lock
+                    protocol_state
+                        .read()
                         .package_sender
                         .send(AppPackage::Alert(AlertPackage {
                             level: AlertPackageLevel::DEBUG,
@@ -196,7 +203,8 @@ pub fn protocol_read_stream(
                         .expect("---Failed to send app package");
                 }
 
-                lock
+                protocol_state
+                    .read()
                     .package_sender
                     .send(AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::DEBUG,
@@ -222,7 +230,8 @@ pub fn protocol_read_stream(
                     }
                 };
 
-                lock
+                protocol_state
+                    .read()
                     .package_sender
                     .send(AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::DEBUG,

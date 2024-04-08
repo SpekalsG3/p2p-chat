@@ -1,11 +1,12 @@
 use std::sync::Arc;
-use protocol::core::state::ProtocolState;
-use protocol::types::package::AppPackage;
+use protocol::types::{
+    state::ProtocolState,
+    package::AppPackage,
+};
 use crate::utils::ui::UITerminal;
 
 pub struct AppStateInner {
-    // don't like that this fields are public
-    pub protocol_state: ProtocolState, // this is accessed only to be passed to protocol functions
+    pub protocol_state: ProtocolState, // this is used to interact with the protocol
     pub ui: UITerminal, // this is accessed only by frontend
 }
 

@@ -5,12 +5,14 @@ use crate::core::{
     node_info::NodeInfo,
     start_pinging::start_pinging,
     read_stream::protocol_read_stream,
-    state::{ProtocolState, StreamMetadata},
 };
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
+use crate::types::{
+    state::{ProtocolState, StreamMetadata},
+    package::{AlertPackage, AlertPackageLevel, AppPackage},
+};
 
 fn handle_connection(
-    app_state: ProtocolState,
+    protocol_state: ProtocolState,
     mut stream: TcpStream,
 ) {
     let addr;
@@ -28,13 +30,14 @@ fn handle_connection(
             }
         };
 
-        let lock = &mut *app_state.lock().expect("---Failed to get write lock");
+        let lock = &mut *protocol_state.lock().expect("---Failed to get write lock");
 
         for _ in 0..frames_count {
             lock.state.next();
         }
 
-        lock
+        protocol_state
+            .read()
             .package_sender
             .send(AppPackage::Alert(AlertPackage {
                 level: AlertPackageLevel::INFO,
@@ -45,7 +48,7 @@ fn handle_connection(
         let mut conn_metadata = StreamMetadata::new();
 
         {
-            let package_sender = &lock.package_sender;
+            let package_sender = &protocol_state.read().package_sender;
             let state = &mut lock.state;
             let streams = &mut lock.streams;
 
@@ -82,14 +85,14 @@ fn handle_connection(
     }
 
     {
-        let app_state = app_state.clone();
+        let app_state = protocol_state.clone();
         pinging_handle = std::thread::spawn(move || {
             start_pinging(app_state, addr)
         })
     }
 
     protocol_read_stream(
-        app_state,
+        protocol_state,
         addr,
         stream,
     );
@@ -118,8 +121,8 @@ fn running_server(
                 handles.push(h);
             },
             Err(e) => {
-                let lock = app_state.lock().expect("---Failed to get write lock");
-                lock
+                app_state
+                    .read()
                     .package_sender
                     .send(AppPackage::Alert(AlertPackage {
                         level: AlertPackageLevel::ERROR,
@@ -132,15 +135,14 @@ fn running_server(
 }
 
 pub fn start_server(
-    app_state: ProtocolState,
+    protocol_state: ProtocolState,
     server_addr: SocketAddr,
 ) -> Option<JoinHandle<()>> {
     let server = {
-        let mut lock = app_state.lock().expect("---Failed to get write lock");
-
         let server = TcpListener::bind(server_addr).expect("---Failed to assign udp socket");
 
-        lock
+        protocol_state
+            .read()
             .package_sender
             .send(AppPackage::Alert(AlertPackage {
                 level: AlertPackageLevel::INFO,
@@ -148,14 +150,12 @@ pub fn start_server(
             }))
             .expect("---Failed to send app package");
 
-        lock.server_addr = server_addr;
-
         server
     };
 
     Some(
         std::thread::spawn(|| {
-            running_server(app_state, server)
+            running_server(protocol_state, server)
         })
     )
 }

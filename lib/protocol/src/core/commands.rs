@@ -2,8 +2,10 @@ use std::net::{SocketAddr};
 use std::sync::mpsc::Receiver;
 use std::thread::JoinHandle;
 use crate::core::client::start_client;
-use crate::core::state::ProtocolState;
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
+use crate::types::{
+    state::ProtocolState,
+    package::{AlertPackage, AlertPackageLevel, AppPackage},
+};
 
 pub enum ProtocolCommand {
     ClientConnect {
@@ -34,8 +36,7 @@ fn process_command(
             ProtocolCommand::ClientDisconnect(addr) => {
                 if let Err(e) = protocol_state.disconnect(addr) {
                     protocol_state
-                        .lock()
-                        .expect("--Failed to get lock on state")
+                        .read()
                         .package_sender.send(AppPackage::Alert(AlertPackage {
                             level: AlertPackageLevel::ERROR,
                             msg: format!("Failed to disconnect: {}", e)

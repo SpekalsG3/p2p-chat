@@ -10,13 +10,10 @@ use crate::frontend::setup_frontend;
 use crate::frontend::state::{AppState, AppStateInner};
 use crate::utils::ui::UITerminal;
 
-use protocol::core::{
-    commands::command_processor,
-    client::start_client,
-    server::handle_connection::start_server,
-    state::ProtocolState,
+use protocol::types::{
+    builder::ProtocolBuilder,
+    package::{AlertPackage, AlertPackageLevel, AppPackage},
 };
-use protocol::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
 fn main() {
     let (server_addr, client_addr) = {
@@ -48,22 +45,23 @@ fn main() {
         )
     };
 
-    let (package_sender, package_receiver) = channel();
-    let (command_sender, command_receiver) = channel();
 
-    let app_state = {
-        let seed = 1234567; // todo: get seed randomly
-        let protocol_state = ProtocolState::new(
-            server_addr,
-            command_sender,
-            package_sender,
-            seed,
-        );
-        AppState::new(AppStateInner {
-            protocol_state,
-            ui: UITerminal::new(),
-        })
-    };
+    let (package_sender, package_receiver) = channel();
+    let mut protocol_builder = ProtocolBuilder::new(
+        server_addr,
+        package_sender,
+        1234567, // todo: get seed randomly
+    );
+    // this will be removed with ui commands like `/connect`
+    if let Some(client_addr) = client_addr {
+        protocol_builder.set_client(client_addr)
+    }
+    let (protocol_state, protocol_handles) = protocol_builder.build();
+
+    let app_state = AppState::new(AppStateInner {
+        protocol_state,
+        ui: UITerminal::new(),
+    });
     let mut handles = vec![];
 
     app_state.new_package(AppPackage::Alert(AlertPackage {
@@ -71,24 +69,7 @@ fn main() {
         msg: "Init threads".to_string(),
     }));
 
-    {
-        let protocol_state = app_state.protocol_state.clone();
-        if let Some(handle) = start_server(protocol_state, server_addr) {
-            handles.push(handle);
-        }
-    }
-
-    // this will be removed with ui commands like `/connect`
-    if let Some(client_addr) = client_addr {
-        let protocol_state = app_state.protocol_state.clone();
-        let handle = start_client(protocol_state, client_addr, None);
-        handles.extend(handle);
-    }
-
-    handles.extend(command_processor(
-        app_state.protocol_state.clone(),
-        command_receiver, // this is a bridge from application to protocol
-    ));
+    handles.extend(protocol_handles);
     handles.extend(setup_frontend(
         app_state.clone(),
         package_receiver, // this is a bridge from protocol to application
