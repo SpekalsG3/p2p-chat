@@ -132,32 +132,41 @@ because:
 
 # Security
 
-## Risks and solutions
+## Brainstorm the problems
 
 Main problem is P2P network is trust. Node A should trust Node B to share info
 from other nodes without modifying it. Without that, cannot trust message contents,
-cannot trust P2P network status. However, that's a huge request. Solving three problems
-below will allow fearless participation in network.  
+cannot trust P2P network status. However, that's a huge request. Solving three
+problems below will allow fearless participation in network.
 
-### Node can filter what to share
+However, currently, there's no solution to problem 1 or 2 (variants of
+an eclipse attack). All existing solutions require mandatory multiple
+connections to verify the message with other nodes. It is done either by
+public list of IPs or seeders (basically DNS) which share IPs of other nodes.
+
+One possible solution is to use collateral - reputation or some currency.
+However, that's prone to dedicated actors to run a long scam or spend as
+much money as required until they get what they want.
+
+### 1. Node can filter what to share
 
 - Node won't share other nodes
 - Node refuses to broadcast received packages
 
-Well, it seems there's no solution to that. If Node C signs, encrypts or does whatever with
+---
+
+If Node C signs, encrypts or does whatever with
 the message and then sends it to Node A through Node B, then Node B can just simply not
 send it further. Node A won't see the message.
 
-! Signature or smth of the software used? If Node B has modified the node software,
+- Signature or smth of the software used? If Node B has modified the node software,
 then Node C can choose to ignore you as untrustworthy.
 This signature has to be dynamic and other party has to calculate it for you.
 Also, it has to support different builds to support versioning and customization.
+  - Node B can run honest private node alongside to generate the signature and use
+  them in dishonest software.
 
-Node B can run honest node alongside to generate the signature and use it in dishonest node.
-
-?
-
-### Node can pose as other actors
+### 2. Node can pose as other actors
 
 In the case of group chat, if Node C can read the message sent from Node B,
 then it can repackage the message with own signature and send it to Node A.
@@ -170,9 +179,7 @@ Node B can send something that impossible to replace. Not signature, can just re
 Recipient has to be unable to read the original message so that's impossible to change it.
 But that's the whole point of communication.
 
-?
-
-### DMs and group chats in single network
+### 3. DMs and group chats in single network
 
 Basically solving middle man attack. RSA used to solve that.
 
