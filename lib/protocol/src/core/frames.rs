@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use anyhow::{bail, Result};
-use crate::protocol::node_info::NodeInfo;
+use crate::core::node_info::NodeInfo;
 use crate::utils::socket_addr_to_bytes::{socket_addr_from_bytes, socket_addr_to_bytes};
 
 const PROT_OPCODE_CONTINUATION: u8 = 0b0000; // received frame is a continuation of previous unfinished frame

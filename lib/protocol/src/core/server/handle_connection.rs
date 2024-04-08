@@ -1,10 +1,12 @@
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
-use crate::protocol::frames::ProtocolMessage;
-use crate::protocol::node_info::NodeInfo;
-use crate::protocol::start_pinging::start_pinging;
-use crate::protocol::read_stream::protocol_read_stream;
-use crate::protocol::state::{ProtocolState, StreamMetadata};
+use crate::core::{
+    frames::ProtocolMessage,
+    node_info::NodeInfo,
+    start_pinging::start_pinging,
+    read_stream::protocol_read_stream,
+    state::{ProtocolState, StreamMetadata},
+};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
 fn handle_connection(

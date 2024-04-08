@@ -5,10 +5,11 @@ currently stays like that.
 
 ---
 
-This is a P2P chat with its own simple protocol ~~and Diffie-Hellman+RSA encryption~~
+This is a P2P node with its own custom protocol
 built with std Rust using only convenience libraries.
 
 # Limitations to pure xterm interface
+
 - If changing cursor horizontally `V100::GoLineUp`/`Down`/`InsertBlankLines`/`MoveWindowUp`,
 in the end it has to stay on same line bc otherwise terminal doesn't scroll
   (new lines are outputted but below the last shown line).

@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 use crate::frontend::handle_input::handle_input;
 use crate::frontend::handle_packages::handle_packages;
 use crate::frontend::state::AppState;
-use crate::types::package::AppPackage;
+use protocol::types::package::AppPackage;
 
 mod handle_packages;
 mod handle_input;

@@ -1,7 +1,9 @@
 use std::net::{Shutdown, SocketAddr};
 use std::time::{Duration, SystemTime};
-use crate::protocol::frames::ProtocolMessage;
-use crate::protocol::state::ProtocolState;
+use crate::core::{
+    frames::ProtocolMessage,
+    state::ProtocolState,
+};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
 const PING_INTERVAL: u64 = 2 * 60; // 2 minutes

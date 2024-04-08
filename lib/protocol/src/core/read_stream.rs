@@ -1,7 +1,7 @@
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::{Duration, SystemTime};
-use crate::commands::ProtocolCommand;
-use crate::protocol::{
+use crate::core::{
+    commands::ProtocolCommand,
     frames::ProtocolMessage,
     node_info::NodeInfo,
     state::ProtocolState,

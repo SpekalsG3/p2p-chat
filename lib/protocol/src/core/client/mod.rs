@@ -1,9 +1,9 @@
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::thread::JoinHandle;
 use std::time::SystemTime;
-use crate::protocol::frames::ProtocolMessage;
-use crate::protocol::read_stream::protocol_read_stream;
-use crate::protocol::state::{ProtocolState, StreamMetadata};
+use crate::core::frames::ProtocolMessage;
+use crate::core::read_stream::protocol_read_stream;
+use crate::core::state::{ProtocolState, StreamMetadata};
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::utils::sss_triangle::sss_triangle;
 

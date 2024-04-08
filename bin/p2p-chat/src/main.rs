@@ -1,21 +1,22 @@
 mod frontend;
-mod protocol;
 mod types;
 mod utils;
-mod commands;
 
 use std::env::args;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
-use crate::commands::command_processor;
 use crate::frontend::setup_frontend;
 use crate::frontend::state::{AppState, AppStateInner};
-use crate::protocol::client::start_client;
-use crate::protocol::server::handle_connection::start_server;
-use crate::protocol::state::ProtocolState;
-use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 use crate::utils::ui::UITerminal;
+
+use protocol::core::{
+    commands::command_processor,
+    client::start_client,
+    server::handle_connection::start_server,
+    state::ProtocolState,
+};
+use protocol::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
 fn main() {
     let (server_addr, client_addr) = {
@@ -85,7 +86,7 @@ fn main() {
     }
 
     handles.extend(command_processor(
-        app_state.clone(),
+        app_state.protocol_state.clone(),
         command_receiver, // this is a bridge from application to protocol
     ));
     handles.extend(setup_frontend(

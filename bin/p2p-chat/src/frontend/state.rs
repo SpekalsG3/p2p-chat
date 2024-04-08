@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use crate::protocol::state::ProtocolState;
-use crate::types::package::AppPackage;
+use protocol::core::state::ProtocolState;
+use protocol::types::package::AppPackage;
 use crate::utils::ui::UITerminal;
 
 pub struct AppStateInner {
