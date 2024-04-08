@@ -17,9 +17,10 @@ impl AppStateInner {
                 let msg = String::from_utf8_lossy(&message.msg).to_string();
                 self.ui.new_message(&format!("User: {}", message.from), &msg);
             }
-            AppPackage::Alert(alert) => {
+            AppPackage::Alert(_alert) => {
+                // self.ui.new_message(&format!("System: {}", alert.level), &alert.msg);
                 // todo: write macro to wrap sending packages and ignore `level: DEBUG` in release mode
-                self.ui.new_message(&format!("System: {}", alert.level), &alert.msg);
+                return;
             }
         }
     }
