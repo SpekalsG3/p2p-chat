@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::mpsc::Sender;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex, MutexGuard};

@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 use crate::core::{
@@ -125,10 +124,6 @@ async fn running_server(
             }
         }
     }
-
-    for j in handles {
-        j.await.expect("Thread failed");
-    }
 }
 
 pub async fn start_server(
@@ -151,9 +146,7 @@ pub async fn start_server(
         server
     };
 
-    Some(
-        tokio::spawn(
-            running_server(protocol_state, server),
-        )
-    )
+    Some(tokio::spawn(
+        running_server(protocol_state, server),
+    ))
 }

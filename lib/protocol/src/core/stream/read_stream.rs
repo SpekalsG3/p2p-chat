@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-use tokio::io::AsyncWriteExt;
 use crate::core::{
     commands::ProtocolCommand,
     frames::ProtocolMessage,
@@ -62,7 +61,7 @@ pub async fn read_message(
                     .expect("Failed to send StreamRequest");
             }
 
-            {
+            { // don't need to store the id longer than the largest ping between peers
                 let app_state = protocol_state.clone();
                 tokio::spawn(async move {
                     let ping = if biggest_ping == 0 {

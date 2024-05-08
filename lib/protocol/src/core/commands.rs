@@ -2,10 +2,7 @@ use std::net::{SocketAddr};
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use crate::core::client::start_client;
-use crate::types::{
-    state::ProtocolState,
-    package::{AlertPackage, AlertPackageLevel, AppPackage},
-};
+use crate::types::state::ProtocolState;
 
 pub enum ProtocolCommand {
     ClientConnect {

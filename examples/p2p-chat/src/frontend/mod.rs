@@ -5,7 +5,6 @@ use crate::frontend::handle_input::handle_input;
 use crate::frontend::state::AppState;
 use protocol::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
-mod handle_packages;
 mod handle_input;
 mod send_message;
 pub mod state;
@@ -21,13 +20,13 @@ pub async fn setup_frontend(
         select! {
             res = reader.read_line(&mut line) => {
                 match res {
-                    Ok(str) => {
+                    Ok(_) => {
                         handle_input(&app_state, &line).await;
                     },
                     Err(e) => {
                         app_state.new_package(AppPackage::Alert(AlertPackage {
                             level: AlertPackageLevel::ERROR,
-                            msg: "Failed to read_line".to_string(),
+                            msg: format!("Failed to read_line {}", e),
                         }));
                     }
                 }
