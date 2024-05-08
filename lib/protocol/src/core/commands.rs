@@ -1,6 +1,6 @@
 use std::net::{SocketAddr};
-use std::sync::mpsc::Receiver;
-use std::thread::JoinHandle;
+use tokio::sync::mpsc::Receiver;
+use tokio::task::JoinHandle;
 use crate::core::client::start_client;
 use crate::types::{
     state::ProtocolState,
@@ -17,32 +17,34 @@ pub enum ProtocolCommand {
     ClientDisconnect(SocketAddr),
 }
 
-fn process_command(
+async fn process_command(
     protocol_state: ProtocolState,
-    command_receiver: Receiver<ProtocolCommand>,
+    mut command_receiver: Receiver<ProtocolCommand>,
 ) {
     let mut handles = vec![];
 
-    while let Ok(command) = command_receiver.recv() {
+    while let Some(command) = command_receiver.recv().await {
         match command {
             ProtocolCommand::ClientConnect { targ_addr, src_addr, src_to_targ_ping } => {
                 let h = start_client(
                     protocol_state.clone(),
                     targ_addr,
                     Some((src_addr, src_to_targ_ping)),
-                );
+                ).await;
                 handles.extend(h);
             }
             ProtocolCommand::ClientDisconnect(addr) => {
-                if let Err(e) = protocol_state.disconnect(addr) {
-                    protocol_state
-                        .read()
-                        .package_sender.send(AppPackage::Alert(AlertPackage {
-                            level: AlertPackageLevel::ERROR,
-                            msg: format!("Failed to disconnect: {}", e)
-                        }))
-                        .expect("--Failed to send package")
-                }
+                // todo
+                // if let Err(e) = protocol_state.disconnect(addr).await {
+                //     protocol_state
+                //         .read()
+                //         .package_sender.send(AppPackage::Alert(AlertPackage {
+                //             level: AlertPackageLevel::ERROR,
+                //             msg: format!("Failed to disconnect: {}", e)
+                //         }))
+                //         .await
+                //         .expect("--Failed to send package")
+                // }
             }
         }
     }
@@ -52,9 +54,9 @@ pub fn command_processor(
     protocol_state: ProtocolState,
     command_receiver: Receiver<ProtocolCommand>,
 ) -> [JoinHandle<()>; 1] {
-    let handle = std::thread::spawn(|| {
+    let handle = tokio::spawn(
         process_command(protocol_state, command_receiver)
-    });
+    );
 
     [handle]
 }

@@ -8,4 +8,5 @@ edition.workspace = true
 [dependencies]
 protocol.workspace = true
 
+tokio = { workspace = true, features = ["io-std", "io-util", "macros", "rt-multi-thread", "sync"] }
 anyhow.workspace = true

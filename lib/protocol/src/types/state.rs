@@ -1,16 +1,23 @@
 use std::collections::HashMap;
-use std::io::Write;
-use std::net::{Shutdown, SocketAddr, TcpStream};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::mpsc::Sender;
+use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::sync::mpsc::Sender;
 use anyhow::{anyhow, Context, Result};
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::sync::{Mutex, MutexGuard};
 use crate::core::{
     commands::ProtocolCommand,
     frames::ProtocolMessage,
 };
 use crate::types::package::AppPackage;
 use crate::utils::prng::{Splitmix64, Xoshiro256ss};
+
+pub enum StreamRequest {
+    Disconnect,
+    Send(ProtocolMessage)
+}
 
 #[derive(Debug)]
 pub(crate) struct StreamMetadata {
@@ -39,7 +46,7 @@ pub struct ProtocolStateInnerRead {
 }
 pub(crate) struct ProtocolStateInnerMut {
     pub command_sender: Sender<ProtocolCommand>,
-    pub streams: HashMap<SocketAddr, (TcpStream, StreamMetadata)>,
+    pub streams: HashMap<SocketAddr, (Sender<StreamRequest>, StreamMetadata)>,
     pub state: Xoshiro256ss,
     pub data_id_states: HashMap<u64, ()>,
 }
@@ -75,46 +82,33 @@ impl ProtocolState {
         &self.0.r
     }
 
-    pub(crate) fn lock(&self) -> Result<MutexGuard<ProtocolStateInnerMut>> {
-        self.0.m.lock().map_err(|e| anyhow!(e.to_string()))
+    pub(crate) async fn lock(&self) -> MutexGuard<ProtocolStateInnerMut> {
+        self.0.m.lock().await
     }
 
-    pub fn send_message(
-        state: &mut Xoshiro256ss,
+    pub async fn send_message(
         stream: &mut TcpStream,
         message: ProtocolMessage,
     ) -> Result<()> {
         for chunk in message.into_frames()? {
-            state.next();
-            stream.write(&chunk).map_err(|e| anyhow!("---Failed to write to stream: {}", e.to_string()))?;
+            stream.write(&chunk).await.map_err(|e| anyhow!("---Failed to write to stream: {}", e.to_string()))?;
         }
 
         Ok(())
     }
 
-    pub fn disconnect(&self, addr: SocketAddr) -> Result<()> {
-        let mut lock = self.lock().context("---Failed to get write lock")?;
-
-        let (stream, _) = lock.streams.get_mut(&addr).context("Addr does not exist")?;
-        stream.shutdown(Shutdown::Both).context("Failed to shutdown the stream")?;
-        lock.streams.remove(&addr);
-
-        Ok(())
-    }
-
-    pub fn broadcast_data(&self, data: Vec<u8>) -> Result<()> {
-        let lock = &mut *self.lock().expect("---Failed to acquire write lock");
+    pub async fn broadcast_data(&self, data: Vec<u8>) -> Result<()> {
+        let lock = &mut *self.lock().await;
         let streams = &mut lock.streams;
         let state = &mut lock.state;
 
         let id = state.next();
 
-        for (_, (ref mut stream, _)) in streams.iter_mut() {
-            ProtocolState::send_message(
-                state,
-                stream,
-                ProtocolMessage::Data(id, data.clone()),
-            )?;
+        for (_, (ref mut channel, _)) in streams.iter_mut() {
+            channel
+                .send(StreamRequest::Send(ProtocolMessage::Data(id, data.clone())))
+                .await
+                .expect("Failed to send data to stream request channel")
         }
 
         Ok(())

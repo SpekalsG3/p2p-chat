@@ -1,6 +1,7 @@
-use std::io::Read;
-use std::net::{SocketAddr, TcpStream};
+use std::net::SocketAddr;
 use anyhow::{bail, Result};
+use tokio::net::TcpStream;
+use tokio::io::AsyncReadExt;
 use crate::core::node_info::NodeInfo;
 use crate::utils::socket_addr_to_bytes::{socket_addr_from_bytes, socket_addr_to_bytes};
 
@@ -107,7 +108,7 @@ impl ProtocolMessage {
         Ok(result)
     }
 
-    pub fn from_stream(
+    pub async fn from_stream(
         stream: &mut TcpStream,
     ) -> Result<Option<(Self, usize)>> {
         let mut buf = Vec::new();
@@ -119,7 +120,7 @@ impl ProtocolMessage {
         loop {
             frames_count += 1;
 
-            let n = stream.read(&mut frame)?;
+            let n = stream.read(&mut frame).await?;
             if n == 0 {
                 return Ok(None); // stream has ended = host disconnected
             }

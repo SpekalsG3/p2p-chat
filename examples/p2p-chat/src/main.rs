@@ -5,7 +5,7 @@ mod utils;
 use std::env::args;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::sync::mpsc::channel;
+use tokio::sync::mpsc::channel;
 use crate::frontend::setup_frontend;
 use crate::frontend::state::{AppState, AppStateInner};
 use crate::utils::ui::UITerminal;
@@ -15,7 +15,8 @@ use protocol::types::{
     package::{AlertPackage, AlertPackageLevel, AppPackage},
 };
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let (server_addr, client_addr) = {
         let mut args = args().skip(1);
 
@@ -46,7 +47,7 @@ fn main() {
     };
 
 
-    let (package_sender, package_receiver) = channel();
+    let (package_sender, package_receiver) = channel(10);
     let mut protocol_builder = ProtocolBuilder::new(
         server_addr,
         package_sender,
@@ -54,9 +55,9 @@ fn main() {
     );
     // this will be removed with ui commands like `/connect`
     if let Some(client_addr) = client_addr {
-        protocol_builder.set_client(client_addr)
+        protocol_builder.set_client(client_addr).await
     }
-    let (protocol_state, protocol_handles) = protocol_builder.build();
+    let (protocol_state, protocol_handles) = protocol_builder.build().await;
 
     let app_state = AppState::new(AppStateInner {
         protocol_state,
@@ -70,14 +71,14 @@ fn main() {
     }));
 
     handles.extend(protocol_handles);
-    handles.extend(setup_frontend(
+
+    handles.push(tokio::spawn(setup_frontend(
         app_state.clone(),
         package_receiver, // this is a bridge from protocol to application
-    ));
-
-    for handle in handles {
-        handle.join()
-            .map_err(|e| panic!("---Error joining the thread - {:?}", e))
+    )));
+    for join in handles {
+        join
+            .await
             .expect("---Thread panic'd");
     }
 }

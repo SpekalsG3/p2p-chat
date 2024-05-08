@@ -2,8 +2,8 @@ use std::io::{stdout, Write};
 use crate::frontend::state::AppState;
 use crate::types::ui::V100;
 
-pub fn send_message(
-    app_state: AppState,
+pub async fn send_message(
+    app_state: &AppState,
     message: &str,
 ) {
     let index = {
@@ -33,5 +33,6 @@ pub fn send_message(
     app_state
         .protocol_state
         .broadcast_data(message.as_bytes().to_vec())
+        .await
         .expect(&format!("Failed to broadcast message #{}", index));
 }

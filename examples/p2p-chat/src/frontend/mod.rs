@@ -1,32 +1,45 @@
-use std::sync::mpsc::Receiver;
-use std::thread::JoinHandle;
+use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tokio::select;
+use tokio::sync::mpsc::Receiver;
 use crate::frontend::handle_input::handle_input;
-use crate::frontend::handle_packages::handle_packages;
 use crate::frontend::state::AppState;
-use protocol::types::package::AppPackage;
+use protocol::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
 
 mod handle_packages;
 mod handle_input;
 mod send_message;
 pub mod state;
 
-pub fn setup_frontend(
+pub async fn setup_frontend(
     app_state: AppState,
-    package_receiver: Receiver<AppPackage>,
-) -> [JoinHandle<()>; 2] {
-    [{
-        let app_state = app_state.clone();
-        std::thread::spawn(move || {
-            handle_input(app_state);
-        })
-    },
-    {
-        let app_state = app_state.clone();
-        std::thread::spawn(move || {
-            handle_packages(
-                app_state,
-                package_receiver,
-            );
-        })
-    }]
+    mut package_receiver: Receiver<AppPackage>,
+) {
+    let stdin = io::stdin();
+    let mut reader = BufReader::new(stdin);
+    let mut line = String::new();
+    loop {
+        select! {
+            res = reader.read_line(&mut line) => {
+                match res {
+                    Ok(str) => {
+                        handle_input(&app_state, &line).await;
+                    },
+                    Err(e) => {
+                        app_state.new_package(AppPackage::Alert(AlertPackage {
+                            level: AlertPackageLevel::ERROR,
+                            msg: "Failed to read_line".to_string(),
+                        }));
+                    }
+                }
+            },
+            package = package_receiver.recv() => {
+                if let Some(package) = package {
+                    app_state.new_package(package);
+                } else {
+                    app_state.ui.new_message(&format!("System: {}", AlertPackageLevel::INFO), "channel hangup");
+                    break;
+                }
+            }
+        }
+    }
 }
