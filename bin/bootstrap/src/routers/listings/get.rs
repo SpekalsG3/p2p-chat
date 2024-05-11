@@ -19,11 +19,6 @@ fn exec(
     })
 }
 
-// TODO:
-//  While users would need only a % of all servers, I'm not sure how to make it secure.
-//  Users cannot rely on node getting random N samples, bc author can modify this code.
-//  Also, getting a slice of N addresses can be beneficial to attackers by providing malicious nodes first.
-//  Thus, Query `return N addresses` should be introduced only with some kind of proof of honest random sampling.
 pub async fn get_listings(
     State(state): State<AppStateRc>,
 ) -> Json<ApiResponse<GetListingsRes, String>> {
