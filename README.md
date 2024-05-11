@@ -17,14 +17,6 @@ more additions to the docs.*
 Examples are available at `/examples` directory. Each one is used for demonstrative
 purposes only.
 
-# Protocol
-
-
-
-# Problems
-- [ ] Multi-party room
-  - [x] How to share messages for all the connected nodes?
-  - [ ] How to share node specific messages?
-- [ ] Measuring the ping accurately in step 1. TCP is a three-way handshake.
-`CONN_INIT` is one way. `PING` is initiated on the server.
-`ACK` shouldn't be there. What else?
+# TODO
+- [ ] pub and private modules
+- [ ] features for protocol lib to limit unnecessary exports 
