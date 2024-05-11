@@ -22,5 +22,5 @@ network without trusting someone exclusively. It doesn't matter if bootstrap nod
 censor someone as each node can choose to reorganize itself later (e.g. change IP).
 
 To participate in the network, newcomer first goes through identity layer and receives
-some personalized ID: DHT route, OAuth token from third-party services or
-none at all - anything other nodes willing to accept.
+some personalized ID: node relative position token, OAuth token from third-party
+services or none at all - anything other nodes willing to accept.
