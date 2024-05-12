@@ -38,7 +38,7 @@ It is based on reputation, connection redundancy and organization in clusters
 
 In my setup, reputation will be handled by gossip layer.
 Redundancy of some kind will be done anyway. So that's ok.
-This approach differs only organization.
+This approach differs only in organization.
 
 ## TODO
 
