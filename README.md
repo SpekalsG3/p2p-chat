@@ -18,5 +18,7 @@ Examples are available at `/examples` directory. Each one is used for demonstrat
 purposes only.
 
 # TODO
+- [ ] Handle errors. For now, I don't care bc I want to finish working
+proof of concept first
 - [ ] pub and private modules
 - [ ] features for protocol lib to limit unnecessary exports 
