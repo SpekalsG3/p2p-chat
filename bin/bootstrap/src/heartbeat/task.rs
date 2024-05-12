@@ -1,21 +1,48 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use tokio::select;
 use protocol::core::frames::ProtocolMessage;
 use crate::types::AppStateRc;
 
 async fn ping(
     server: &SocketAddr,
 ) -> Result<(), String> {
-    let message = ProtocolMessage::Ping.into_frames().map_err(|e| format!("Failed to convert message into frames: {e}"))?;
+    let message = ProtocolMessage::Ping
+        .into_frames()
+        .map_err(|e| format!("Failed to convert message into frames: {e}"))?;
 
-    let mut stream = TcpStream::connect(server).await.map_err(|e| format!("Failed to connect to listed server: {e}"))?;
+    let mut stream = TcpStream::connect(server)
+        .await
+        .map_err(|e| format!("Failed to connect to listed server: {e}"))?;
 
     for chunk in message {
-        stream.write(&chunk).await.map_err(|e| format!("Failed to write to stream: {e}"))?;
+        stream
+            .write(&chunk)
+            .await
+            .map_err(|e| format!("Failed to write to stream: {e}"))?;
     }
 
-    Ok(())
+    let res = select! {
+        result = ProtocolMessage::from_stream(&mut stream) => {
+            let (response, _) = result
+                .map_err(|e| format!("Failed to read message: {e}"))?
+                .ok_or("Stream closed before received response")?;
+            match response {
+                ProtocolMessage::Pong(_) => Ok(()),
+                _ => Err("Expected Pong on Ping message".to_string()),
+            }
+        },
+        _ = tokio::time::sleep(Duration::from_secs(1 * 60)) => {
+            Err("Failed to receive timeout in 1 minute".to_string())
+        }
+    };
+
+    // todo: Should it also send `ConnClosed` frame? Node suppose to close conn itself...
+    stream.shutdown().await.expect("Failed to shutdown stream");
+
+    res
 }
 
 pub async fn heartbeat_task(
