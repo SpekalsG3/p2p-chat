@@ -57,7 +57,7 @@ pub async fn protocol_handle_stream(
                     ProtocolMessage::ConnClosed,
                 )
                     .await
-                    .expect("Failed to send protocol to stream");
+                    .expect("Failed to send protocol message to stream");
                 stream.shutdown().await.expect("Failed to shutdown the stream");
                 protocol_state.lock().await.streams.remove(&addr);
                 break;
