@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 use crate::core::{
@@ -26,6 +27,18 @@ async fn handle_connection(
 
         addr = match first_message {
             ProtocolMessage::ConnInit { server_addr } => server_addr,
+            ProtocolMessage::Ping => {
+                ProtocolState::send_message(
+                    &mut stream,
+                    ProtocolMessage::Pong(None),
+                ).await.expect("Failed to send message to stream");
+                ProtocolState::send_message(
+                    &mut stream,
+                    ProtocolMessage::ConnClosed,
+                ).await.expect("Failed to send message to stream");
+                stream.shutdown().await.expect("Failed to disconnect");
+                return;
+            },
             _ => {
                 unreachable!("Unexpected first message")
             }
