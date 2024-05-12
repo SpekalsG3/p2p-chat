@@ -5,11 +5,11 @@ use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::mpsc::Receiver;
 use crate::core::frames::ProtocolMessage;
-use crate::types::state::{ProtocolState, StreamRequest};
+use crate::types::state::ProtocolState;
 
 pub mod read_stream;
 pub mod ping_stream;
-mod types;
+pub mod types;
 
 use types::StreamAction;
 use crate::types::package::{AlertPackage, AlertPackageLevel, AppPackage};
@@ -18,7 +18,7 @@ pub async fn protocol_handle_stream(
     protocol_state: ProtocolState,
     addr: SocketAddr,
     mut stream: TcpStream, // should be cloned anyway bc otherwise `&mut` at `stream.read` will block whole application
-    mut stream_request_sender: Receiver<StreamRequest>
+    mut stream_request_sender: Receiver<StreamAction>
 ) {
     ping_stream::ping_action(&protocol_state, addr).await; // we need to start pinging right away
 
@@ -35,12 +35,9 @@ pub async fn protocol_handle_stream(
                         }))
                         .await
                         .expect("Failed to send package message");
-                    StreamAction::Disconnect
+                    StreamAction::InitiateDisconnect
                 } else {
-                    match request.unwrap() {
-                        StreamRequest::Disconnect => StreamAction::Disconnect,
-                        StreamRequest::Send(message) => StreamAction::Send(message),
-                    }
+                    request.unwrap()
                 }
             }
             message = ProtocolMessage::from_stream(&mut stream) => {
@@ -54,7 +51,18 @@ pub async fn protocol_handle_stream(
 
         match action {
             StreamAction::None => {},
-            StreamAction::Disconnect => {
+            StreamAction::InitiateDisconnect => {
+                ProtocolState::send_message(
+                    &mut stream,
+                    ProtocolMessage::ConnClosed,
+                )
+                    .await
+                    .expect("Failed to send protocol to stream");
+                stream.shutdown().await.expect("Failed to shutdown the stream");
+                protocol_state.lock().await.streams.remove(&addr);
+                break;
+            },
+            StreamAction::AcceptDisconnect => {
                 stream.shutdown().await.expect("Failed to shutdown the stream");
                 protocol_state.lock().await.streams.remove(&addr);
                 break;

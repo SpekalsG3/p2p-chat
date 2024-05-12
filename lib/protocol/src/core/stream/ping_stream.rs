@@ -26,7 +26,7 @@ pub async fn ping_action(
     if metadata.ping_started_at.is_some() {
         // means host did not respond to last ping = host is dead
 
-        return StreamAction::Disconnect;
+        return StreamAction::InitiateDisconnect;
     }
 
     metadata.ping_started_at = Some(now);

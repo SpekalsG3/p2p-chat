@@ -11,17 +11,13 @@ use crate::core::{
     commands::ProtocolCommand,
     frames::ProtocolMessage,
 };
+use crate::core::stream::types::StreamAction;
 use crate::types::package::AppPackage;
 use crate::utils::prng::{Splitmix64, Xoshiro256ss};
 
-pub enum StreamRequest {
-    Disconnect,
-    Send(ProtocolMessage)
-}
-
 #[derive(Debug)]
 pub(crate) struct StreamMetadata {
-    pub ping: u16, // in milliseconds but we check that ping is less then 60000 so it can fit
+    pub ping: u16, // in milliseconds but we check that ping is less than 60000, so it can fit
     pub ping_started_at: Option<SystemTime>,
     pub topology_rad: f32, // angel relative to the first connection, used to determine who's closer to another user
     // vec of address this node knows about for any cross-referencing
@@ -46,7 +42,7 @@ pub struct ProtocolStateInnerRead {
 }
 pub(crate) struct ProtocolStateInnerMut {
     pub command_sender: Sender<ProtocolCommand>,
-    pub streams: HashMap<SocketAddr, (Sender<StreamRequest>, StreamMetadata)>,
+    pub streams: HashMap<SocketAddr, (Sender<StreamAction>, StreamMetadata)>,
     pub state: Xoshiro256ss,
     pub data_id_states: HashMap<u64, ()>,
 }
@@ -106,7 +102,7 @@ impl ProtocolState {
 
         for (_, (ref mut channel, _)) in streams.iter_mut() {
             channel
-                .send(StreamRequest::Send(ProtocolMessage::Data(id, data.clone())))
+                .send(StreamAction::Send(ProtocolMessage::Data(id, data.clone())))
                 .await
                 .expect("Failed to send data to stream request channel")
         }

@@ -10,7 +10,6 @@ use crate::types::{
     state::ProtocolState,
     package::{AlertPackage, AlertPackageLevel, AppPackage, MessagePackage},
 };
-use crate::types::state::StreamRequest;
 use crate::utils::sss_triangle::sss_triangle;
 
 pub async fn read_message(
@@ -20,7 +19,7 @@ pub async fn read_message(
 ) -> StreamAction {
     if message.is_none() {
         // stream has ended = host disconnected
-        return StreamAction::Disconnect;
+        return StreamAction::InitiateDisconnect;
     }
     let (message, _) = message.unwrap();
 
@@ -37,7 +36,7 @@ pub async fn read_message(
             unreachable!("Unexpected protocol message")
         }
         ProtocolMessage::ConnClosed => {
-            return StreamAction::Disconnect;
+            return StreamAction::AcceptDisconnect;
         }
         ProtocolMessage::Data(id, data) => {
             if data_id_states.contains_key(&id) {
@@ -56,7 +55,7 @@ pub async fn read_message(
 
                 state.next();
                 channel
-                    .send(StreamRequest::Send(ProtocolMessage::Data(id, data.clone())))
+                    .send(StreamAction::Send(ProtocolMessage::Data(id, data.clone())))
                     .await
                     .expect("Failed to send StreamRequest");
             }
@@ -144,7 +143,7 @@ pub async fn read_message(
                         .expect("---Failed to send NodeCommand");
 
                     channel
-                        .send(StreamRequest::Disconnect)
+                        .send(StreamAction::InitiateDisconnect)
                         .await
                         .expect("Failed to send StreamRequest");
                 }
@@ -180,7 +179,7 @@ pub async fn read_message(
                     }))
                     .await
                     .expect("---Failed to send app package");
-                return StreamAction::Disconnect;
+                return StreamAction::InitiateDisconnect;
             }
             let ping = ping as u16;
 

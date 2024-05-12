@@ -2,7 +2,8 @@ use std::net::{SocketAddr};
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use crate::core::client::start_client;
-use crate::types::state::{ProtocolState, StreamRequest};
+use crate::core::stream::types::StreamAction;
+use crate::types::state::ProtocolState;
 
 pub enum ProtocolCommand {
     ClientConnect {
@@ -33,7 +34,7 @@ async fn process_command(
             ProtocolCommand::ClientDisconnect(addr) => {
                 if let Some((channel, _)) = protocol_state.lock().await.streams.get(&addr) {
                     channel
-                        .send(StreamRequest::Disconnect)
+                        .send(StreamAction::InitiateDisconnect)
                         .await
                         .expect("--Failed to send request to disconnect")
                 }

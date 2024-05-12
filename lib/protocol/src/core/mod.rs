@@ -3,4 +3,4 @@ pub mod frames;
 pub mod client;
 pub mod server;
 pub mod commands;
-mod stream;
+pub mod stream;
